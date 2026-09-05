@@ -1,0 +1,107 @@
+{
+  "name": "morrow",
+  "version": "0.0.0",
+  "description": "A deployable workspace for eve agents. Don't wait for tomorrow—deploy with Morrow",
+  "author": "Logan Dziuk",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gocougs2020/morrow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gocougs2020/morrow/issues"
+  },
+  "homepage": "https://github.com/gocougs2020/morrow#readme",
+  "keywords": [
+    "eve",
+    "ai-agent",
+    "nextjs",
+    "better-auth",
+    "vercel"
+  ],
+  "type": "module",
+  "imports": {
+    "#*": "./agent/*",
+    "#evals/*": "./evals/*"
+  },
+  "scripts": {
+    "build": "next build",
+    "deploy": "eve deploy",
+    "dev": "next dev",
+    "eval": "eve eval",
+    "start": "next start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:eve": "eve build",
+    "dev:eve": "eve dev",
+    "start:eve": "eve start",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@neondatabase/serverless": "^1.1.0",
+    "@radix-ui/react-use-controllable-state": "1.2.2",
+    "@rive-app/react-webgl2": "^4.32.1",
+    "@shikijs/core": "3.23.0",
+    "@shikijs/engine-javascript": "3.23.0",
+    "@shikijs/engine-oniguruma": "3.23.0",
+    "@streamdown/cjk": "1.0.3",
+    "@streamdown/code": "1.1.1",
+    "@streamdown/math": "1.0.2",
+    "@streamdown/mermaid": "1.0.2",
+    "@tailwindcss/postcss": "4.3.0",
+    "@vercel/blob": "^2.8.0",
+    "@xyflow/react": "^12.11.5",
+    "ai": "^7.0.58",
+    "ansi-to-react": "^6.2.6",
+    "better-auth": "^1.7.1",
+    "better-sqlite3": "^12.11.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "cmdk": "1.1.1",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "embla-carousel-react": "^8.6.0",
+    "eve": "0.47.3",
+    "jose": "^6.2.10",
+    "lucide-react": "1.16.0",
+    "media-chrome": "^4.19.2",
+    "motion": "12.40.0",
+    "nanoid": "5.1.11",
+    "next": "16.3.3",
+    "next-themes": "^0.4.6",
+    "radix-ui": "1.4.3",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-hook-form": "^7.86.0",
+    "react-jsx-parser": "^2.4.1",
+    "resend": "^6.25.0",
+    "shiki": "3.23.0",
+    "streamdown": "2.5.0",
+    "tailwind-merge": "3.6.0",
+    "tailwindcss": "4.3.0",
+    "tokenlens": "^1.3.1",
+    "use-stick-to-bottom": "1.1.4",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "24.x",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "just-bash": "^3.4.2",
+    "microsandbox": "0.5.10",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "npm@11.19.0",
+  "overrides": {
+    "next": "$next"
+  }
+}

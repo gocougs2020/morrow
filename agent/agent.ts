@@ -1,0 +1,42 @@
+import { defineAgent, defineDynamic } from "eve";
+import { COMPACTION_MODEL, resolveSessionModelSelection } from "./lib/models";
+
+function attributionFrom(ctx: {
+  readonly session: {
+    readonly id: string;
+    readonly auth: { readonly current?: { principalId?: string | null; principalType?: string | null } | null };
+  };
+}) {
+  const auth = ctx.session.auth.current;
+  return {
+    eveSessionId: ctx.session.id,
+    userId:
+      auth?.principalType === "user" && auth.principalId ? auth.principalId : undefined,
+  };
+}
+
+export default defineAgent({
+  compaction: {
+    // Window is already min(256k, 90% of model capacity); compact when that cap is reached.
+    model: COMPACTION_MODEL,
+    thresholdPercent: 1,
+  },
+  build: {
+    externalDependencies: [
+      "better-sqlite3",
+      "better-auth",
+      "@neondatabase/serverless",
+      "@vercel/blob",
+      "resend",
+    ],
+  },
+  model: defineDynamic({
+    events: {
+      // Assess the first prompt once, then lock the model so later turns hit the prompt cache.
+      "session.started": async (_event, ctx) =>
+        resolveSessionModelSelection(ctx.messages, attributionFrom(ctx)),
+      "turn.started": async (_event, ctx) =>
+        resolveSessionModelSelection(ctx.messages, attributionFrom(ctx)),
+    },
+  }),
+});
