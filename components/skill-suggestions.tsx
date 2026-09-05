@@ -1,11 +1,15 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Suggestion } from "@/components/ai-elements/suggestion";
 import { useAvailableSkills } from "@/hooks/use-available-skills";
 import { filterHomeSuggestedSkills, type AvailableSkill } from "@/lib/available-skills";
 
 const skillGapPx = 8;
+
+function subscribeNoop() {
+  return () => undefined;
+}
 
 function shuffleSkills(skills: readonly AvailableSkill[]): AvailableSkill[] {
   const next = [...skills];
@@ -107,18 +111,14 @@ export function SkillSuggestions({
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const slugsKey = skills.map((skill) => skill.slug).join("\0");
-  // Shuffle only after mount so SSR and hydration share a stable first paint.
-  const [randomized, setRandomized] = useState(false);
+  // Shuffle only after hydration so SSR and the first client paint share a stable order.
+  const randomized = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const order = useMemo(
     () => (randomized ? orderHomeSkills(skills) : stableHomeSkills(skills)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reshuffle only when the slug set changes
     [randomized, slugsKey],
   );
   const [visibleCount, setVisibleCount] = useState<number>(skills.length);
-
-  useLayoutEffect(() => {
-    setRandomized(true);
-  }, []);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
