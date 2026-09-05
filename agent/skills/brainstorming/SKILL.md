@@ -21,7 +21,7 @@ Works for work or personal ideas. Do not dump a list of popular options. Questio
    - **Value** — why the audience (or the outcome) is better for it
    - **Novelty** — how this is not a generic version of the same idea
 4. Mark each angle `ready`, `needs research`, or `needs a partner`. Do not invent availability, prices, or legal constraints. Load `research` only after an angle is worth checking.
-5. Close with the strongest recommendation and one next step: more questions, research, `write-rewrite`, or `proposal`.
+5. Close with the strongest recommendation and one next step: more questions, research, `write`, or `plan`.
 
 ## Follow-up questions
 
@@ -33,7 +33,7 @@ Prefer questions that change the work, not ones that fill a form:
 - What have they already tried that we should not repeat?
 - Where is the budget actually tight: time, money, energy, or people?
 
-Skip intake fields (names, party size, dates, budget band) unless they are still unknown — then collect them and load `lead-intake` if this is a new person or request.
+Skip intake fields (names, dates, budget band) unless they are still unknown — then collect them and load `intake` if this is a new person or request.
 
 ## Angle template
 

@@ -9,7 +9,7 @@ description: >
 
 # Files
 
-Create durable files the user can edit, reopen, and share — notes, reports, intake briefs, quotes, plans, tables, pages, uploads, or images. Session-generated records belong here (or in sticky-note memory only when they are durable preferences). Draft in chat first. Then offer to save. Do not call `create_document` before they have seen a first-pass answer unless they already asked to save or file it.
+Create durable files the user can edit, reopen, and share — notes, reports, intake briefs, plans, comparisons, tables, pages, uploads, or images. Session-generated records belong here (or in sticky-note memory only when they are durable preferences). Draft in chat first. Then offer to save. Do not call `create_document` before they have seen a first-pass answer unless they already asked to save or file it.
 
 1. Choose the kind: `markdown` for reports and plans, `csv` for tables, `html` for a formatted page, `text` for plain notes, `json` for structured data.
 2. After they have seen a draft — or they already asked to save — call `create_document` with a clear title and the full file contents. Attach it to this session unless they asked otherwise. If they named a folder, call `list_folders` and pass `folderId`. Create a folder with `create_folder` when they asked for a new one; include a short description of what belongs there.

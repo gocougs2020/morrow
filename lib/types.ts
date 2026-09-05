@@ -229,9 +229,18 @@ export type EmbeddingSearchInput = {
   queryEmbeddings: readonly number[][];
   kinds?: readonly EmbeddingKind[];
   excludeSourceIds?: readonly string[];
+  /**
+   * Also include embeddings whose `sourceId` is in this list, even when they
+   * belong to another user (shared/public library rows). Ignored when `scope`
+   * is `"account"`.
+   */
+  includeSourceIds?: readonly string[];
   limit: number;
   minScore?: number;
-  /** `account` searches every user's embeddings; the caller must drop private hits. */
+  /**
+   * `account` searches every user's embeddings; the caller must drop private
+   * hits. Library and inbox search should use user scope plus `includeSourceIds`.
+   */
   scope?: "user" | "account";
 };
 

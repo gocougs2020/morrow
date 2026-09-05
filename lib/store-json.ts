@@ -63,15 +63,10 @@ const filePath = path.join(process.cwd(), ".data", "app.json");
 
 function load(): AppData {
   try {
-    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as Partial<AppData> & {
-      itineraries?: unknown;
-      leads?: unknown;
-      quotes?: unknown;
-    };
-    const { itineraries: _itineraries, leads: _leads, quotes: _quotes, ...rest } = parsed;
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as Partial<AppData>;
     return {
       ...empty,
-      ...rest,
+      ...parsed,
       chats: (parsed.chats ?? []).map((chat) => ({
         ...chat,
         description: chat.description ?? "",
@@ -674,10 +669,12 @@ export function searchUserEmbeddings(input: EmbeddingSearchInput): EmbeddingSear
   const queries = input.queryEmbeddings.filter((query) => query.length > 0);
   if (queries.length === 0 || input.limit <= 0) return [];
 
-  const records =
-    input.scope === "account"
-      ? load().embeddings.filter((row) => !input.kinds || input.kinds.includes(row.kind))
-      : listUserEmbeddings(input.userId, input.kinds);
+  const records = load().embeddings.filter((row) => {
+    if (input.kinds && !input.kinds.includes(row.kind)) return false;
+    if (input.scope === "account") return true;
+    if (row.userId === input.userId) return true;
+    return Boolean(input.includeSourceIds?.includes(row.sourceId));
+  });
   return records
     .filter((record) => !input.excludeSourceIds?.includes(record.sourceId))
     .map((record) => ({

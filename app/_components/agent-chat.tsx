@@ -1,9 +1,9 @@
 "use client";
 
-import type { ChatStatus, FileUIPart, UIMessage, UserContent } from "ai";
+import type { ChatStatus, FileUIPart, UserContent } from "ai";
 import type { ClientSessionState, MessageStreamEvent } from "eve/client";
-import { type EveMessage, useEveAgent } from "eve/react";
-import { AlertCircleIcon, ArrowLeftIcon, BrainIcon, FileTextIcon } from "lucide-react";
+import { useEveAgent } from "eve/react";
+import { AlertCircleIcon, ArrowLeftIcon, BrainIcon, FileTextIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -59,6 +59,7 @@ import {
 } from "@/lib/session-events";
 import { documentsFromToolOutput } from "@/lib/client-documents";
 import { isTextDocumentKind } from "@/lib/document-kind";
+import { cn } from "@/lib/utils";
 import {
   catalogForAssistantMessage,
   parseSessionFromStack,
@@ -66,6 +67,11 @@ import {
   previousSessionId,
 } from "@/lib/session-citations";
 import type { ChatRecord, ClientDocument, SessionCitationSet } from "@/lib/types";
+import {
+  conversationFilename,
+  persistChatFiles,
+  transcriptDownloadMessages,
+} from "./agent-chat-download";
 import { AgentMessage } from "./agent-message";
 
 const sessionToolbarHoverClass = "hover:bg-foreground/8 dark:hover:bg-foreground/12";
@@ -119,6 +125,7 @@ export function AgentChat(props: AgentChatProps) {
   const chatKey = props.chat?.id ?? "draft";
   if (hydratedChatKeyRef.current !== chatKey) {
     hydratedChatKeyRef.current = chatKey;
+    // eslint-disable-next-line react-hooks/refs -- reset hydration when the chat changes
     hydratedEventsRef.current = props.initialEvents ?? [];
   }
 
@@ -147,9 +154,11 @@ export function AgentChat(props: AgentChatProps) {
     <AgentChatSession
       key={`${props.chat?.id ?? "draft"}:${storeGeneration}`}
       {...props}
+      // eslint-disable-next-line react-hooks/refs -- remount handoff
       autoSend={retryRef.current}
       canvasHost={landing ? undefined : canvasHost}
       hideComposer={!landing}
+      // eslint-disable-next-line react-hooks/refs -- remount handoff
       initialEvents={hydratedEventsRef.current}
       onComposerChange={landing ? undefined : setComposer}
       prompt={prompt}
@@ -238,6 +247,7 @@ function AgentChatSession({
   const chatList = workspace?.chats ?? localChats;
   const setChatList = workspace?.setChats ?? setLocalChats;
   const activeChatRef = useRef(activeChat);
+  // eslint-disable-next-line react-hooks/refs -- latest chat for async handlers
   activeChatRef.current = activeChat;
   const citationNav = { currentChatId: activeChat?.id ?? "", fromStack };
   const [sessionDocuments, setSessionDocuments] = useState<ClientDocument[]>([]);
@@ -257,6 +267,7 @@ function AgentChatSession({
 
   useEffect(() => {
     if (!chat) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync session from the parent
     setActiveChat(chat);
     setChatTitle(chat.title);
   }, [chat]);
@@ -370,6 +381,7 @@ function AgentChatSession({
       body: JSON.stringify({ touchUpdatedAt: true }),
     });
   };
+  // eslint-disable-next-line react-hooks/refs -- latest activity marker
   markSessionActivityRef.current = markSessionActivity;
 
   const persistSession = (session: ClientSessionState | undefined) => {
@@ -503,8 +515,10 @@ function AgentChatSession({
     },
   });
 
+  // eslint-disable-next-line react-hooks/refs -- latest send for retries
   sendRef.current = agent.send;
   const cancelAgentRef = useRef(agent.cancel);
+  // eslint-disable-next-line react-hooks/refs -- latest cancel for workspace registration
   cancelAgentRef.current = agent.cancel;
   const sendPromptRef = useRef<(message: PromptInputMessage) => Promise<void>>(undefined);
 
@@ -741,6 +755,7 @@ function AgentChatSession({
     }
   };
 
+  // eslint-disable-next-line react-hooks/refs -- latest sendPrompt for layout effects
   sendPromptRef.current = sendPrompt;
 
   const composerSubmitting = creating || isResuming;
@@ -940,6 +955,27 @@ function AgentChatSession({
         onDeleteChat={deleteChat}
         triggerClassName="md:hidden"
       />
+      <Button
+        asChild
+        className={`md:hidden ${sessionToolbarHoverClass}`}
+        size="icon-sm"
+        variant="ghost"
+      >
+        <Link
+          aria-label="New session"
+          href="/s"
+          onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+              return;
+            }
+            if (!workspace) return;
+            event.preventDefault();
+            workspace.openNewSession();
+          }}
+        >
+          <PlusIcon aria-hidden="true" />
+        </Link>
+      </Button>
       <div className="min-w-0 flex-1">
         {activeChat && backHref ? (
           <Link
@@ -981,13 +1017,21 @@ function AgentChatSession({
             aria-label={
               sessionDocuments.length > 0
                 ? `Files, ${sessionDocuments.length}`
-                : "Files"
+                : "No files in this session"
             }
-            className={sessionToolbarHoverClass}
+            className={cn(
+              sessionDocuments.length > 0
+                ? sessionToolbarHoverClass
+                : "text-muted-foreground",
+            )}
+            disabled={sessionDocuments.length === 0}
             size="sm"
             type="button"
             variant={canvasOpen ? "secondary" : "ghost"}
-            onClick={() => updateCanvasOpen(!canvasOpen)}
+            onClick={() => {
+              if (sessionDocuments.length === 0) return;
+              updateCanvasOpen(!canvasOpen);
+            }}
           >
             <FileTextIcon aria-hidden="true" />
             Files
@@ -1153,48 +1197,11 @@ function sessionTitleMessages(messages: readonly string[]): string[] {
   return recent.includes(first) ? messages.slice(-6) : [first, ...recent];
 }
 
-function transcriptDownloadMessages(messages: readonly EveMessage[]): UIMessage[] {
-  return messages.flatMap((message) => {
-    const parts = message.parts.flatMap((part) =>
-      part.type === "text" && part.text ? [{ text: part.text, type: "text" as const }] : [],
-    );
-    return parts.length > 0 ? [{ id: message.id, parts, role: message.role }] : [];
-  });
-}
-
-function conversationFilename(title: string, chatId: string): string {
-  const slug = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-  return `${slug || `morrow-${chatId}`}.md`;
-}
-
 function toChatStatus(status: ReturnType<typeof useEveAgent>["status"]): ChatStatus | undefined {
   if (status === "submitted" || status === "streaming" || status === "error") {
     return status;
   }
   return undefined;
-}
-
-async function persistChatFiles(chatId: string, files: FileUIPart[]) {
-  for (const file of files) {
-    if (!file.url) continue;
-    try {
-      const blob = await fetch(file.url).then((response) => response.blob());
-      const body = new FormData();
-      body.append("file", blob, file.filename ?? "upload");
-      body.append("title", file.filename?.replace(/\.[^.]+$/, "") || "Upload");
-      body.append("filename", file.filename ?? "upload");
-      body.append("mimeType", file.mediaType);
-      body.append("chatId", chatId);
-      await fetch("/api/documents", { method: "POST", body });
-    } catch {
-      // Uploading into the library is best-effort and must not block the turn.
-    }
-  }
 }
 
 function toErrorMessage(error: unknown): string {

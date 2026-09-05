@@ -1,18 +1,14 @@
 import { gateway, generateText } from "ai";
 import { appConfig } from "@/app.config";
 
-const SEARCH_TYPES = ["auto", "fast", "instant"] as const;
-const SEARCH_CATEGORIES = [
-  "company",
-  "people",
-  "research paper",
-  "news",
-  "personal site",
-  "financial report",
-] as const;
-
-type SearchType = (typeof SEARCH_TYPES)[number];
-type SearchCategory = (typeof SEARCH_CATEGORIES)[number];
+type SearchType = "auto" | "fast" | "instant";
+type SearchCategory =
+  | "company"
+  | "people"
+  | "research paper"
+  | "news"
+  | "personal site"
+  | "financial report";
 
 export type WebSearchInput = {
   readonly abortSignal?: AbortSignal;

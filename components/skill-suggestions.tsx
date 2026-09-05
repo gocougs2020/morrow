@@ -21,6 +21,13 @@ function shuffleSkills(skills: readonly AvailableSkill[]): AvailableSkill[] {
   return next;
 }
 
+function stableHomeSkills(skills: readonly AvailableSkill[]): AvailableSkill[] {
+  return [
+    ...skills.filter((skill) => skill.source === "user"),
+    ...skills.filter((skill) => skill.source !== "user"),
+  ];
+}
+
 function orderHomeSkills(skills: readonly AvailableSkill[]): AvailableSkill[] {
   return [
     ...shuffleSkills(skills.filter((skill) => skill.source === "user")),
@@ -99,13 +106,19 @@ export function SkillSuggestions({
   const skills = useMemo(() => filterHomeSuggestedSkills(available), [available]);
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
-  const [order, setOrder] = useState<AvailableSkill[]>(() => [...skills]);
-  const [visibleCount, setVisibleCount] = useState<number>(skills.length);
   const slugsKey = skills.map((skill) => skill.slug).join("\0");
+  // Shuffle only after mount so SSR and hydration share a stable first paint.
+  const [randomized, setRandomized] = useState(false);
+  const order = useMemo(
+    () => (randomized ? orderHomeSkills(skills) : stableHomeSkills(skills)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reshuffle only when the slug set changes
+    [randomized, slugsKey],
+  );
+  const [visibleCount, setVisibleCount] = useState<number>(skills.length);
 
   useLayoutEffect(() => {
-    setOrder(orderHomeSkills(skills));
-  }, [slugsKey]);
+    setRandomized(true);
+  }, []);
 
   useLayoutEffect(() => {
     const container = containerRef.current;

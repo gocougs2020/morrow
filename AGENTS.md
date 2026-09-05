@@ -7,8 +7,8 @@ This project uses the eve framework: an agent is a directory of files under `age
 Brand, home page copy, built-in skill enablement, and model IDs live in `app.config.ts`. Edit that file for name, tagline, composer placeholders, which default skills are on or suggested, chat/image/embedding/transcription models, and related-session memory thresholds. Do not re-hardcode those values in `lib/brand.ts`, `lib/suggested-skills.ts`, or feature modules — they already read the config. Secrets, host URLs, and access allowlists (`ALLOWED_SIGNUP_EMAILS`, `ALLOWED_SIGNUP_DOMAINS`, `BLOCKED_ACCESS_EMAILS`, `ALLOWED_ACCOUNT_USAGE_EMAILS`) stay in `.env.local` / Vercel env. Never put emails or domains in `app.config.ts`.
 
 - **Identity, purpose, tone** — `agent/instructions.md` (or files under `agent/instructions/`). You do not need the framework docs for a content-only instructions change.
-- **Skill procedure** — `agent/skills/<slug>/SKILL.md`. Toggle `enabled` / `suggest` and the home-page chip in `app.config.ts`. Add a matching config entry when you add a built-in skill folder. Do not copy coding-agent or library skills (ai-elements, streamdown, ai-sdk, agent-browser, web-design-guidelines) into `agent/skills/` — eve advertises every skill every turn.
-- **Session-generated records** — persist intake briefs, quotes, plans, and similar as files (`create_document`) or sticky-note memory (durable preferences only). Do not add rigid Neon tables for CRM-shaped data in this repo. A fork may add a table in `lib/db/schema.ts`, store helpers in `lib/store-pg.ts` / `lib/store-json.ts`, and a tool under `agent/tools/`.
+- **Skill procedure** — `agent/skills/<slug>/SKILL.md`. Toggle `enabled` / `suggest` and the home-page chip in `app.config.ts`. Add a matching config entry when you add a built-in skill folder. Built-in skills should stay semi-generic (work, home, or a light creative example), not a hyper-specific vertical. Do not copy coding-agent or library skills (ai-elements, streamdown, ai-sdk, agent-browser, web-design-guidelines) into `agent/skills/` — eve advertises every skill every turn.
+- **Session-generated records** — persist intake briefs, plans, comparisons, and similar as files (`create_document`) or sticky-note memory (durable preferences only). Do not add rigid Neon tables for CRM-shaped data in this repo. A fork may add a table in `lib/db/schema.ts`, store helpers in `lib/store-pg.ts` / `lib/store-json.ts`, and a tool under `agent/tools/`.
 - **Which model ID a feature uses** — `app.config.ts` (`models.*`). Preserve `agent/agent.ts` unless the user asks to change how the low/high model is chosen at session or turn time.
 - **Human install and deploy docs** — `README.md`. Keep it in sync when you add a config key or env var.
 
@@ -61,6 +61,8 @@ A setup may report `eve link` as a prerequisite; run it, then retry the continua
 ## Validate the change
 
 Run the validation the task requests. When it does not establish the behavior you changed, run the narrowest relevant check.
+
+`npm run typecheck` covers `agent/tools`, `lib`, and `agent/skills/user.ts`. Skill procedure folders (`SKILL.md`) are markdown, not TypeScript.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

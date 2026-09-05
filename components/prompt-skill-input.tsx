@@ -43,7 +43,10 @@ export function PromptSkillInput({
   const listRef = useRef<HTMLDivElement>(null);
   const caretRef = useRef(value.length);
   const [caret, setCaret] = useState(value.length);
-  const [highlight, setHighlight] = useState(0);
+  const [highlightState, setHighlightState] = useState<{
+    index: number;
+    key?: string;
+  }>({ index: 0 });
   const [dismissedAt, setDismissedAt] = useState<number>();
 
   const slugs = useMemo(() => new Set(skills.map((skill) => skill.slug)), [skills]);
@@ -53,10 +56,19 @@ export function PromptSkillInput({
     [skills, slash],
   );
   const menuOpen = Boolean(slash) && !disabled && dismissedAt !== slash?.start;
-
-  useEffect(() => {
-    setHighlight(0);
-  }, [slash?.query, slash?.start]);
+  const slashKey = slash ? `${slash.start}:${slash.query}` : undefined;
+  const highlight = highlightState.key === slashKey ? highlightState.index : 0;
+  const setHighlight = useCallback(
+    (next: number | ((current: number) => number)) => {
+      setHighlightState((prev) => {
+        const current = prev.key === slashKey ? prev.index : 0;
+        const index = typeof next === "function" ? next(current) : next;
+        if (prev.key === slashKey && prev.index === index) return prev;
+        return { index, key: slashKey };
+      });
+    },
+    [slashKey],
+  );
 
   useEffect(() => {
     const active = listRef.current?.querySelector("[data-active=true]");
@@ -205,6 +217,16 @@ export function PromptSkillInput({
         onMouseUp={() => {
           const editor = editorRef.current;
           if (editor) updateCaret(caretOffset(editor));
+        }}
+        onDragOver={(event) => {
+          if (event.dataTransfer?.types.includes("Files")) {
+            event.preventDefault();
+          }
+        }}
+        onDrop={(event) => {
+          if (event.dataTransfer?.types.includes("Files")) {
+            event.preventDefault();
+          }
         }}
         onPaste={(event) => {
           const items = event.clipboardData?.items;

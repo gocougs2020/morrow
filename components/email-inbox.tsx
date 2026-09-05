@@ -32,14 +32,15 @@ export function EmailInbox({ emails: initialEmails }: { readonly emails: ClientE
   const timer = useRef<number>(undefined);
   const seq = useRef(0);
 
+  const trimmedQuery = query.trim();
+  const inSearch = Boolean(trimmedQuery);
+  const showSearching = inSearch && (searching || results === undefined);
+
   useEffect(() => {
     const trimmed = query.trim();
     window.clearTimeout(timer.current);
-    if (!trimmed) {
-      setResults(undefined);
-      setSearching(false);
-      return;
-    }
+    if (!trimmed) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- search status while fetching
     setSearching(true);
     const next = ++seq.current;
     timer.current = window.setTimeout(() => {
@@ -112,7 +113,7 @@ export function EmailInbox({ emails: initialEmails }: { readonly emails: ClientE
 
         {query.trim() ? (
           <p className="text-muted-foreground text-sm">
-            {searching || results === undefined ? "Searching…" : `${visible.length} matching emails`}
+            {showSearching ? "Searching…" : `${visible.length} matching emails`}
           </p>
         ) : null}
 
@@ -120,7 +121,7 @@ export function EmailInbox({ emails: initialEmails }: { readonly emails: ClientE
           <div className="rounded-xl border bg-white/30 px-4 py-16 text-center text-muted-foreground text-sm dark:bg-black/30">
             No mail yet. Ask the agent to send a report or document, or email the inbound Resend address.
           </div>
-        ) : searching || (Boolean(query.trim()) && results === undefined) ? null : visible.length === 0 ? (
+        ) : showSearching ? null : visible.length === 0 ? (
           <div className="rounded-xl border bg-white/30 px-4 py-16 text-center text-muted-foreground text-sm dark:bg-black/30">
             {query.trim() ? "No emails match that search." : "No emails in this folder."}
           </div>

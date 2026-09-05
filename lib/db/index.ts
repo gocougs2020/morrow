@@ -248,9 +248,6 @@ async function createNeonAuthTables() {
   `;
   await sql`ALTER TABLE user_skills ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''`;
   await sql`ALTER TABLE user_skills ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'account'`;
-  await sql`DROP TABLE IF EXISTS leads`;
-  await sql`DROP TABLE IF EXISTS quotes`;
-  await sql`DROP TABLE IF EXISTS itineraries`;
   await sql`
     CREATE TABLE IF NOT EXISTS document_folders (
       id TEXT PRIMARY KEY,

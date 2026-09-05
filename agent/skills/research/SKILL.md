@@ -2,7 +2,7 @@
 name: research
 description: >
   Use when researching options, products, places, people, vendors,
-  events, or conditions — for themselves or someone else. Use even if
+  events, or conditions — for work, family, or themselves. Use even if
   they ask "what's good in…" or "who should I use" without saying
   research. Load immediately when the user writes /research.
 ---

@@ -47,7 +47,7 @@ export function composeSchedulePrompt(input: {
     );
   }
   if (skill && !SKILL_NAME_PATTERN.test(skill)) {
-    throw new Error("Use a skill slug like quote-management.");
+    throw new Error("Use a skill slug like weekly-review.");
   }
   return skill
     ? `${skillMention(skill)}\n\n${SCHEDULE_UNATTENDED}\n\n${brief}`

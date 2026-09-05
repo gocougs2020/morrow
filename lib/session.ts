@@ -14,7 +14,7 @@ export async function getSession() {
     });
     return sessionIfAllowed(session, requestHeaders);
   } catch (error) {
-    if (error instanceof MissingAuthSecretError) throw error;
+    if (error instanceof MissingAuthSecretError) return null;
     console.error("Failed to read session", error);
     return null;
   }

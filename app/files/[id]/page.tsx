@@ -12,17 +12,21 @@ export default async function FilePage({
   const session = await requireSession();
   const { id } = await params;
 
+  let chats;
+  let document;
+  let record;
   try {
-    const [{ chats, document }, record] = await Promise.all([
+    [{ chats, document }, record] = await Promise.all([
       documentWithChats(session.user.id, id),
       getUserDocument(session.user.id, id),
     ]);
-    const content = isTextDocumentKind(record.kind)
-      ? await readDocumentText(record).catch(() => "")
-      : "";
-    return <DocumentWorkspace chats={chats} document={document} initialContent={content} />;
   } catch (error) {
     if (error instanceof DocumentError && error.status === 404) notFound();
     throw error;
   }
+
+  const content = isTextDocumentKind(record.kind)
+    ? await readDocumentText(record).catch(() => "")
+    : "";
+  return <DocumentWorkspace chats={chats} document={document} initialContent={content} />;
 }

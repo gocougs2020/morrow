@@ -21,6 +21,7 @@ import {
   isTextDocumentKind,
   storedMimeType,
 } from "@/lib/document-kind";
+import { DOCUMENT_TOO_LARGE_MESSAGE, MAX_DOCUMENT_BYTES } from "@/lib/document-upload";
 import { embedTexts } from "@/lib/embeddings";
 import {
   attachDocument,
@@ -131,6 +132,9 @@ export async function createUserDocument(
   const filename = filenameForDocument(title, kind, input.filename);
   const mimeType = storedMimeType(filename, kind, input.mimeType);
   const buffer = asBuffer(input.content);
+  if (buffer.byteLength > MAX_DOCUMENT_BYTES) {
+    throw new DocumentError(DOCUMENT_TOO_LARGE_MESSAGE, 413);
+  }
   const id = randomUUID();
   const pathname = `documents/${userId}/${id}/${filename}`;
   const stored = await putDocumentBlob(pathname, buffer, mimeType);
@@ -403,9 +407,9 @@ export async function searchUserLibrary(
         userId,
         queryEmbeddings: [embedding],
         kinds: LIBRARY_EMBEDDING_KINDS,
+        includeSourceIds: [...documents.map((document) => document.id), ...folders.map((folder) => folder.id)],
         limit: Math.max(limit * 2, 24),
         minScore: DOCUMENT_SEARCH_MIN_SCORE,
-        scope: "account",
       });
       for (const hit of semantic) {
         const match: DocumentSearchMatch =

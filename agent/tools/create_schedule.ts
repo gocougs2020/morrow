@@ -13,7 +13,7 @@ const skillSlugSchema = z
   .min(1)
   .max(SKILL_NAME_MAX)
   .transform((value) => canonicalSkillSlug(value.replace(/^\//, "").toLowerCase()))
-  .refine((value) => SKILL_NAME_PATTERN.test(value), "Use a skill slug like quote-management.");
+  .refine((value) => SKILL_NAME_PATTERN.test(value), "Use a skill slug like weekly-review.");
 
 export default defineTool({
   description:
@@ -22,7 +22,7 @@ export default defineTool({
     skill: skillSlugSchema
       .optional()
       .describe(
-        "Enabled skill to invoke each fire (quote-management, consultation-prep, or a custom slug). Omit only for a one-off reminder.",
+        "Enabled skill to invoke each fire (weekly-review, meeting-prep, or a custom slug). Omit only for a one-off reminder.",
       ),
     brief: z
       .string()

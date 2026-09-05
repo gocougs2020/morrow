@@ -82,10 +82,13 @@ export function SettingsPanel({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from the URL
     setActiveTab(tab);
   }, [tab]);
 
   useEffect(() => {
+    // Fetch settings after mount; setState happens in the async continuation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- server refresh on mount
     void refresh();
   }, []);
 
@@ -292,7 +295,7 @@ export function SettingsPanel({
                 <CardTitle>Connections</CardTitle>
                 <CardDescription>
                   Connections let the agent use outside services — email, calendars, or anything
-                  else you wire up. Add or configure connections directly in this app's codebase
+                  else you wire up. Add or configure connections directly in the app codebase
                   under the <code>agent/connections/</code> directory, then restart or redeploy.
                 </CardDescription>
               </CardHeader>

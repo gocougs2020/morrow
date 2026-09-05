@@ -24,7 +24,7 @@ function extensionFor(mediaType: string): string {
 
 export default defineTool({
   description:
-    "Generate an image from a text prompt using GPT Image 2. Use after loading the text-to-image skill when the user wants a visual, illustration, or mood board.",
+    "Generate an image from a text prompt using GPT Image 2. Use after loading the image skill when the user wants a visual, illustration, or mood board.",
   inputSchema: z.object({
     prompt: z
       .string()

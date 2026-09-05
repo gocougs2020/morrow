@@ -23,6 +23,8 @@ export function SessionClient({
 
   useEffect(() => {
     const next = takePendingPrompt(chat.id);
+    // Side-effecting consume of a one-shot pending prompt.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- consume pending prompt
     if (next) setPending(next);
   }, [chat.id]);
 

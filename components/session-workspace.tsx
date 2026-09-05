@@ -48,10 +48,13 @@ export function SessionWorkspace({
   const pathChatId = chatIdFromPath(pathname);
   const highlightId = activeChatId ?? pathChatId;
 
+  // eslint-disable-next-line react-hooks/refs -- latest active id for async open
   activeChatIdRef.current = activeChatId;
+  // eslint-disable-next-line react-hooks/refs -- latest opened id for stale-response checks
   openedIdRef.current = opened?.chat.id;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- merge server chat list into client extras
     setChats((current) => mergeChatLists(current, initialChats));
   }, [initialChats]);
 
@@ -128,6 +131,7 @@ export function SessionWorkspace({
       return;
     }
     if (pathname !== window.location.pathname) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync workspace to the URL
     syncFromPath(pathname);
   }, [pathname, syncFromPath]);
 

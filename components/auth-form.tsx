@@ -56,7 +56,7 @@ export function AuthForm({
             {mode === "sign-up" ? (
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input autoComplete="name" id="name" name="name" />
+                <Input autoComplete="name" id="name" name="name" required />
               </div>
             ) : null}
             <div className="space-y-2">
@@ -66,6 +66,7 @@ export function AuthForm({
                 id="email"
                 inputMode="email"
                 name="email"
+                required
                 spellCheck={false}
                 type="email"
               />
@@ -75,7 +76,9 @@ export function AuthForm({
               <Input
                 autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
                 id="password"
+                minLength={8}
                 name="password"
+                required
                 type="password"
               />
             </div>

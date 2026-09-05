@@ -80,9 +80,9 @@ export async function searchUserInbox(
         userId,
         queryEmbeddings: [embedding],
         kinds: EMAIL_EMBEDDING_KINDS,
+        includeSourceIds: emails.map((email) => email.id),
         limit: Math.max(limit * 2, 24),
         minScore: EMAIL_SEARCH_MIN_SCORE,
-        scope: "account",
       });
       for (const hit of semantic) {
         const email = emails.find((row) => row.id === hit.record.sourceId);

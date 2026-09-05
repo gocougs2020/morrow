@@ -12,7 +12,7 @@ import {
   VideoIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   getAttachmentLabel,
   getMediaCategory,
@@ -154,16 +154,11 @@ export function AttachmentGallery({
   readonly onRemove: (id: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const openIndex = files.findIndex((file) => file.id === openId);
+  const resolvedOpenId = openId && files.some((file) => file.id === openId) ? openId : null;
+  const openIndex = files.findIndex((file) => file.id === resolvedOpenId);
   const current = openIndex >= 0 ? files[openIndex] : undefined;
   const open = current !== undefined;
   const hasSlideshow = files.length > 1;
-
-  useEffect(() => {
-    if (openId && !files.some((file) => file.id === openId)) {
-      setOpenId(null);
-    }
-  }, [files, openId]);
 
   const showAt = (index: number) => {
     const next = files[(index + files.length) % files.length];

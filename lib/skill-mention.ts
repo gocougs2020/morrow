@@ -103,6 +103,14 @@ export function tokenizeSkillMentions(
 
 const SKILL_SLUG_ALIASES: Readonly<Record<string, string>> = {
   documents: "files",
+  "write-rewrite": "write",
+  "text-to-image": "image",
+  "lead-intake": "intake",
+  "consultation-prep": "meeting-prep",
+  proposal: "plan",
+  "quote-management": "decide",
+  "cold-email": "write",
+  copywriting: "write",
 };
 
 export function canonicalSkillSlug(slug: string): string {

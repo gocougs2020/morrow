@@ -17,6 +17,12 @@ export async function POST(request: NextRequest) {
   const email = formField(formData, "email");
   const password = formField(formData, "password", { trim: false });
 
+  if (password.length < 8) {
+    const dest = new URL("/sign-up", request.url);
+    dest.searchParams.set("error", "Password must be at least 8 characters.");
+    return NextResponse.redirect(dest, 303);
+  }
+
   await ensureNeonAuthSchema();
   try {
     await getAuth().api.signUpEmail({

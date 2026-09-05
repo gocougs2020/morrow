@@ -94,17 +94,17 @@ export const appConfig = {
    * Add a new folder under `agent/skills/` and an entry here to register another default.
    */
   skills: {
-    "lead-intake": {
+    brainstorming: {
       enabled: true,
       suggest: true,
-      title: "Intake",
-      emoji: "👋",
+      title: "Brainstorm",
+      emoji: "💡",
     },
-    "consultation-prep": {
+    write: {
       enabled: true,
       suggest: true,
-      title: "Meeting prep",
-      emoji: "📋",
+      title: "Write",
+      emoji: "✍️",
     },
     research: {
       enabled: true,
@@ -112,47 +112,53 @@ export const appConfig = {
       title: "Research",
       emoji: "🔍",
     },
-    proposal: {
+    "meeting-prep": {
+      enabled: true,
+      suggest: true,
+      title: "Meeting prep",
+      emoji: "📋",
+    },
+    plan: {
       enabled: true,
       suggest: true,
       title: "Plan",
       emoji: "🗺️",
     },
-    "quote-management": {
-      enabled: true,
-      suggest: true,
-      title: "Quotes",
-      emoji: "💰",
-    },
-    "text-to-image": {
+    image: {
       enabled: true,
       suggest: true,
       title: "Image",
       emoji: "🎨",
     },
-    "write-rewrite": {
+    household: {
       enabled: true,
       suggest: true,
-      title: "Write & rewrite",
-      emoji: "✍️",
+      title: "Household",
+      emoji: "🏠",
     },
-    "cold-email": {
+    story: {
       enabled: true,
       suggest: true,
-      title: "Cold email",
-      emoji: "📨",
+      title: "Story",
+      emoji: "📖",
     },
-    copywriting: {
+    decide: {
       enabled: true,
       suggest: true,
-      title: "Copywriting",
-      emoji: "🖊️",
+      title: "Decide",
+      emoji: "⚖️",
     },
-    brainstorming: {
+    "weekly-review": {
       enabled: true,
       suggest: true,
-      title: "Brainstorm",
-      emoji: "💡",
+      title: "Weekly review",
+      emoji: "📅",
+    },
+    intake: {
+      enabled: true,
+      suggest: false,
+      title: "Intake",
+      emoji: "👋",
     },
     files: {
       enabled: true,

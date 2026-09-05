@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
@@ -9,13 +9,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+const themeIconClassName = "size-3.5";
+
+function subscribeNoop() {
+  return () => undefined;
+}
+
 function useAppearanceTheme() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(subscribeNoop, () => true, () => false);
 
   const isDark = mounted && resolvedTheme === "dark";
   return {
@@ -32,7 +34,7 @@ export function ThemeAppearanceMenu() {
     <>
       <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={toggle}>
-        {isDark ? <MoonIcon /> : <SunIcon />}
+        {isDark ? <MoonIcon className={themeIconClassName} /> : <SunIcon className={themeIconClassName} />}
         {label}
       </DropdownMenuItem>
     </>
@@ -49,13 +51,13 @@ export function ThemeAppearanceButton({
   return (
     <button
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm! leading-5! text-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
         className,
       )}
       onClick={toggle}
       type="button"
     >
-      {isDark ? <MoonIcon className="size-4" /> : <SunIcon className="size-4" />}
+      {isDark ? <MoonIcon className={themeIconClassName} /> : <SunIcon className={themeIconClassName} />}
       {label}
     </button>
   );

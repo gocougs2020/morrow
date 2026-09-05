@@ -97,17 +97,10 @@ export function ScheduleRow({
   const savedCadence = useRef(cadenceKey(inferJobCadence(job)));
   const saveGeneration = useRef(0);
   const onJobChangeRef = useRef(onJobChange);
+  // eslint-disable-next-line react-hooks/refs -- latest parent callback
   onJobChangeRef.current = onJobChange;
+  // eslint-disable-next-line react-hooks/refs -- last saved brief for debounce
   savedBrief.current = parseSchedulePrompt(job.prompt).brief;
-
-  useEffect(() => {
-    const next = inferJobCadence(job);
-    const nextBrief = parseSchedulePrompt(job.prompt).brief;
-    setBrief(nextBrief);
-    setCadence(next);
-    savedBrief.current = nextBrief;
-    savedCadence.current = cadenceKey(next);
-  }, [job.id]);
 
   useEffect(() => {
     if (brief === parseSchedulePrompt(job.prompt).brief) return;

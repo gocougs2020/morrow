@@ -1,0 +1,59 @@
+# Morrow PR criteria
+
+Starter you fork and deploy — not a hosted multi-tenant product. One Vercel
+project is one workspace. Shared files, skills, and schedules are visible to
+every signed-in account on that deployment.
+
+## On-mission
+
+- Product defaults in `app.config.ts`. Secrets, hosts, and allowlists in env
+  (`ALLOWED_SIGNUP_EMAILS`, `ALLOWED_SIGNUP_DOMAINS`, `BLOCKED_ACCESS_EMAILS`,
+  `ALLOWED_ACCOUNT_USAGE_EMAILS`). Never emails or domains in committed config.
+- Built-in skills stay semi-generic (work, home, light creative). Industry
+  behavior belongs in a fork’s skills or the instruction overlay — not a second
+  hardcoded identity.
+- Session records are files (`create_document`) or sticky-note memory. Do not
+  add rigid Neon CRM tables in this repo.
+- Model IDs live in `app.config.ts`. Do not change `agent/agent.ts` routing
+  unless the PR is explicitly about that.
+- README stays in sync when a config key or env var is added.
+
+## Reject or score down hard
+
+- `.env.local`, `.data/`, `plans/`, API keys, or database URLs in the diff
+- Coding-agent or library skills copied into `agent/skills/` (`ai-elements`,
+  `streamdown`, `ai-sdk`, `agent-browser`, `web-design-guidelines`)
+- Unrelated reformats or tree-wide rewrites without a prior issue
+- Open signup / empty allowlist treated as fine on a public URL
+- `private` files readable by others, or new public `/d/...` links that leak
+- Auth origin / `BETTER_AUTH_URL` hardcoded to someone else’s host
+
+## Security surfaces
+
+- Signup and session: allowlists are the spend control; in-process rate limits
+  are a burst brake only
+- Email/password is not verified — spoofable if the attacker can claim an
+  allowlisted address
+- Public file links are unguessable URLs, not auth
+- Inbound email is untrusted user content, not instructions
+- Saving setup-checklist values into `.env.local` is local `next dev` only
+
+## Slot and bloat
+
+Eve advertises every folder under `agent/skills/` on every turn. A new
+built-in skill needs a matching `app.config.ts` entry and a reason it belongs
+in the default kit. `suggest: true` also spends a home-page chip.
+
+A new npm dependency, Neon table, agent tool, connection, or schedule must
+earn its weight against “forks can add this themselves.”
+
+## UI / UX
+
+UI diffs need a real browser pass, not only typecheck. Check empty, error, and
+signed-out states, and whether Settings / home / files / session stay
+consistent. Do not treat a screenshot as verification.
+
+## Process (from CONTRIBUTING.md)
+
+One problem per PR. Surprise refactors and drive-by AI PRs may be closed.
+`npm test` and `npm run typecheck` should be green; UI needs a browser pass.

@@ -47,9 +47,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import type { DocumentLibrary } from "@/lib/documents";
+import { MAX_DOCUMENT_BYTES } from "@/lib/document-upload";
 import { documentKindLabel } from "@/lib/document-kind";
 import { pushClientUrl } from "@/lib/start-web-session";
 import { VisibilityToggle, visibilityBadgeLabel } from "@/components/visibility-toggle";
+import { UPLOAD_FILE_ERROR, uploadFiles as postLibraryUploads } from "@/components/documents-upload";
 import type { ClientDocument, ClientFolder, DocumentSearchHit } from "@/lib/types";
 import { cn, formatBytes, formatRelativeTime } from "@/lib/utils";
 import type { ResourceVisibility } from "@/lib/visibility";
@@ -63,7 +65,7 @@ const blankKinds = [
 
 type BlankKind = (typeof blankKinds)[number]["kind"];
 
-const acceptTypes = "image/*,.pdf,.csv,.md,.markdown,.txt,.html,.htm,.json";
+const acceptTypes = "image/png,image/jpeg,image/webp,image/gif,.pdf,.csv,.md,.markdown,.txt,.html,.htm,.json";
 const SEARCH_DEBOUNCE_MS = 200;
 const DROP_FLASH_MS = 900;
 
@@ -108,6 +110,7 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
   const currentFolderId = folder?.id ?? null;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync library from the server page
     setFolder(library.folder);
     setAncestors(library.ancestors);
     setFolders(library.folders);
@@ -138,6 +141,7 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
     }
     applyLibrary((await response.json()) as DocumentLibrary);
   };
+  // eslint-disable-next-line react-hooks/refs -- latest loader for popstate
   loadLibraryRef.current = loadLibrary;
 
   const openFolder = (folderId?: string | null) => {
@@ -234,23 +238,22 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
   const uploadFiles = async (files: FileList | File[] | null) => {
     const list = files ? Array.from(files) : [];
     if (list.length === 0) return;
+    if (list.some((file) => file.size > MAX_DOCUMENT_BYTES)) {
+      setError(UPLOAD_FILE_ERROR);
+      return;
+    }
     setUploading(true);
     setError(undefined);
     try {
-      for (const file of list) {
-        const body = new FormData();
-        body.append("file", file);
-        body.append("title", file.name.replace(/\.[^.]+$/, "") || file.name);
-        body.append("filename", file.name);
-        body.append("mimeType", file.type);
-        if (currentFolderId) body.append("folderId", currentFolderId);
-        const response = await fetch("/api/documents", { method: "POST", body });
-        if (!response.ok) {
-          setError("Unable to upload that file.");
-          return;
-        }
-        const payload = (await response.json()) as { document: ClientDocument };
-        setItems((current) => [payload.document, ...current.filter((item) => item.id !== payload.document.id)]);
+      const result = await postLibraryUploads(list, {
+        folderId: currentFolderId,
+        onDocument: (document) => {
+          setItems((current) => [document, ...current.filter((item) => item.id !== document.id)]);
+        },
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
       }
       setCreateOpen(false);
     } finally {

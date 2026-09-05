@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckIcon, ClipboardIcon, DownloadIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AppHeader } from "@/components/app-header";
 import { DocumentEditor } from "@/components/document-editor";
 import {
@@ -44,28 +44,15 @@ export function DocumentWorkspace({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
   const [savedAt, setSavedAt] = useState(document.updatedAt);
-  const [origin, setOrigin] = useState("");
+  const origin = useSyncExternalStore(
+    () => () => undefined,
+    () => window.location.origin,
+    () => "",
+  );
 
   const skipAutosave = useRef(true);
   const sharePath = `/d/${document.shareId}`;
   const shareHref = origin ? `${origin}${sharePath}` : sharePath;
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  useEffect(() => {
-    if (!document.canEdit) return;
-    if (skipAutosave.current) {
-      skipAutosave.current = false;
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      void save(document.editable ? { content, title } : { title });
-    }, 700);
-    return () => window.clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on editor fields only
-  }, [content, title]);
 
   const save = async (patch: {
     content?: string;
@@ -90,6 +77,19 @@ export function DocumentWorkspace({
     setVisibility(payload.document.visibility);
     setSavedAt(payload.document.updatedAt);
   };
+
+  useEffect(() => {
+    if (!document.canEdit) return;
+    if (skipAutosave.current) {
+      skipAutosave.current = false;
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void save(document.editable ? { content, title } : { title });
+    }, 700);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on editor fields only
+  }, [content, title]);
 
   const copyShareLink = () => {
     const href = `${window.location.origin}${sharePath}`;

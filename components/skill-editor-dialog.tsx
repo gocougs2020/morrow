@@ -51,45 +51,60 @@ function draftFromSkill(skill?: UserSkill): SkillDraft {
   };
 }
 
+type SkillEditorDialogProps = {
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onSave: (draft: SkillDraft, skillId?: string) => Promise<UserSkill>;
+  readonly open: boolean;
+  readonly readOnly?: boolean;
+  readonly skill?: UserSkill;
+};
+
 export function SkillEditorDialog({
   onOpenChange,
   onSave,
   open,
   readOnly = false,
   skill,
-}: {
-  readonly onOpenChange: (open: boolean) => void;
-  readonly onSave: (draft: SkillDraft, skillId?: string) => Promise<UserSkill>;
-  readonly open: boolean;
-  readonly readOnly?: boolean;
-  readonly skill?: UserSkill;
-}) {
-  const [draft, setDraft] = useState<SkillDraft>(emptyDraft);
+}: SkillEditorDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <SkillEditorForm
+          onOpenChange={onOpenChange}
+          onSave={onSave}
+          open={open}
+          readOnly={readOnly}
+          skill={skill}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SkillEditorForm({
+  onOpenChange,
+  onSave,
+  open,
+  readOnly = false,
+  skill,
+}: SkillEditorDialogProps) {
+  const [draft, setDraft] = useState(() => draftFromSkill(skill));
   const [prompt, setPrompt] = useState("");
-  const [showAi, setShowAi] = useState(false);
-  const [showEditor, setShowEditor] = useState(false);
+  const [showAi, setShowAi] = useState(() => !skill);
+  const [showEditor, setShowEditor] = useState(() => Boolean(skill));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string>();
-  const [sessionOpen, setSessionOpen] = useState(false);
-  const skillIdRef = useRef<string | undefined>(undefined);
-  const savedDraft = useRef<SkillDraft>(emptyDraft);
+  const skillIdRef = useRef(skill?.id);
+  const savedDraft = useRef(draftFromSkill(skill));
   const onSaveRef = useRef(onSave);
+  // eslint-disable-next-line react-hooks/refs -- latest save handler
   onSaveRef.current = onSave;
-
-  if (open && !sessionOpen) {
-    const next = draftFromSkill(skill);
-    setSessionOpen(true);
-    setDraft(next);
-    savedDraft.current = next;
-    skillIdRef.current = skill?.id;
-    setPrompt("");
-    setShowAi(!skill);
-    setShowEditor(Boolean(skill));
-    setError(undefined);
-    setGenerating(false);
-  } else if (!open && sessionOpen) {
-    setSessionOpen(false);
-  } else if (skill?.id) {
+  if (skill?.id) {
+    // eslint-disable-next-line react-hooks/refs -- keep the skill id for generate/save
     skillIdRef.current = skill.id;
   }
 
@@ -195,142 +210,136 @@ export function SkillEditorDialog({
   }, [draft, generating, open, readOnly]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
-        onCloseAutoFocus={(event) => event.preventDefault()}
-        onOpenAutoFocus={(event) => event.preventDefault()}
-      >
-        <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-          <DialogTitle>{skill ? "Edit skill" : "New skill"}</DialogTitle>
-          <DialogDescription>
-            {showEditor
-              ? "Saved as an Agent Skill: a chip name, slug, when-to-use description, and a short procedure. Update with AI revises the description and instructions only — name and skill ID stay put unless you edit them."
-              : "Describe the skill you want, or use voice. Apply with AI to create a chip name, slug, when to use, and procedure you can edit."}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6">
-          {showEditor ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="skill-name">Name</Label>
-                <Input
-                  id="skill-name"
-                  maxLength={SKILL_DISPLAY_NAME_MAX}
-                  placeholder="👋 Client handoff"
-                  disabled={readOnly || generating}
-                  value={draft.name}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, name: event.currentTarget.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="skill-slug">Skill ID</Label>
-                <Input
-                  id="skill-slug"
-                  maxLength={SKILL_NAME_MAX}
-                  placeholder="client-handoff"
-                  disabled={readOnly || generating}
-                  value={draft.slug}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, slug: event.currentTarget.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="skill-description">Description</Label>
-                <Textarea
-                  id="skill-description"
-                  maxLength={SKILL_DESCRIPTION_MAX}
-                  placeholder="Use when the user wants to…"
-                  disabled={readOnly || generating}
-                  rows={2}
-                  className="min-h-16 resize-none"
-                  value={draft.description}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      description: event.currentTarget.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-3 rounded-xl border bg-card p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm">Instructions</p>
-                    <p className="text-muted-foreground text-xs">
-                      The procedure the agent follows when this skill loads.
-                    </p>
-                  </div>
-                  {readOnly ? null : (
-                    <Button
-                      aria-controls="skill-ai-prompt"
-                      aria-expanded={showAi}
-                      size="sm"
-                      type="button"
-                      variant={showAi ? "secondary" : "outline"}
-                      onClick={() => {
-                        setShowAi((openAi) => !openAi);
-                        setError(undefined);
-                      }}
-                    >
-                      <SparklesIcon />
-                      Update with AI
-                    </Button>
-                  )}
+    <>
+      <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+        <DialogTitle>{skill ? "Edit skill" : "New skill"}</DialogTitle>
+        <DialogDescription>
+          {showEditor
+            ? "Saved as an Agent Skill: a chip name, slug, when-to-use description, and a short procedure. Update with AI revises the description and instructions only — name and skill ID stay put unless you edit them."
+            : "Describe the skill you want, or use voice. Apply with AI to create a chip name, slug, when to use, and procedure you can edit."}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6">
+        {showEditor ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="skill-name">Name</Label>
+              <Input
+                id="skill-name"
+                maxLength={SKILL_DISPLAY_NAME_MAX}
+                placeholder="👋 Client handoff"
+                disabled={readOnly || generating}
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, name: event.currentTarget.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="skill-slug">Skill ID</Label>
+              <Input
+                id="skill-slug"
+                maxLength={SKILL_NAME_MAX}
+                placeholder="client-handoff"
+                disabled={readOnly || generating}
+                value={draft.slug}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, slug: event.currentTarget.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="skill-description">Description</Label>
+              <Textarea
+                id="skill-description"
+                maxLength={SKILL_DESCRIPTION_MAX}
+                placeholder="Use when the user wants to…"
+                disabled={readOnly || generating}
+                rows={2}
+                className="min-h-16 resize-none"
+                value={draft.description}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    description: event.currentTarget.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-3 rounded-xl border bg-card p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">Instructions</p>
+                  <p className="text-muted-foreground text-xs">
+                    The procedure the agent follows when this skill loads.
+                  </p>
                 </div>
-                {showAi ? (
-                  <div className="space-y-2" id="skill-ai-prompt">
-                    <p className="text-muted-foreground text-xs">
-                      AI can change the description and instructions, not the name or skill ID.
-                    </p>
-                    <InstructionPrompt
-                      autoFocus={false}
-                      generating={generating}
-                      id="skill-instruction-prompt"
-                      placeholder="Always confirm the brief first and return a one-screen summary…"
-                      prompt={prompt}
-                      onGenerate={() => void generate()}
-                      onPromptChange={setPrompt}
-                    />
-                  </div>
-                ) : null}
-                <MarkdownDocumentEditor
-                  className="border-0 shadow-none"
-                  disabled={generating || readOnly}
-                  placeholder="Write the steps this skill should follow, or update with AI…"
-                  value={draft.markdown}
-                  onChange={(markdown) => setDraft((current) => ({ ...current, markdown }))}
-                />
+                {readOnly ? null : (
+                  <Button
+                    aria-controls="skill-ai-prompt"
+                    aria-expanded={showAi}
+                    size="sm"
+                    type="button"
+                    variant={showAi ? "secondary" : "outline"}
+                    onClick={() => {
+                      setShowAi((openAi) => !openAi);
+                      setError(undefined);
+                    }}
+                  >
+                    <SparklesIcon />
+                    Update with AI
+                  </Button>
+                )}
               </div>
-            </>
-          ) : (
-            <InstructionPrompt
-              autoFocus={false}
-              generating={generating}
-              id="skill-instruction-prompt"
-              placeholder="A skill for handing a project to a teammate with a checklist and recap…"
-              prompt={prompt}
-              onGenerate={() => void generate()}
-              onPromptChange={setPrompt}
-            />
-          )}
-        </div>
-        <div className="shrink-0 space-y-3 border-t bg-background px-6 py-4">
-          {error ? (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Done
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
+              {showAi ? (
+                <div className="space-y-2" id="skill-ai-prompt">
+                  <p className="text-muted-foreground text-xs">
+                    AI can change the description and instructions, not the name or skill ID.
+                  </p>
+                  <InstructionPrompt
+                    autoFocus={false}
+                    generating={generating}
+                    id="skill-instruction-prompt"
+                    placeholder="Always confirm the brief first and return a one-screen summary…"
+                    prompt={prompt}
+                    onGenerate={() => void generate()}
+                    onPromptChange={setPrompt}
+                  />
+                </div>
+              ) : null}
+              <MarkdownDocumentEditor
+                className="border-0 shadow-none"
+                disabled={generating || readOnly}
+                placeholder="Write the steps this skill should follow, or update with AI…"
+                value={draft.markdown}
+                onChange={(markdown) => setDraft((current) => ({ ...current, markdown }))}
+              />
+            </div>
+          </>
+        ) : (
+          <InstructionPrompt
+            autoFocus={false}
+            generating={generating}
+            id="skill-instruction-prompt"
+            placeholder="A skill for handing a project to a teammate with a checklist and recap…"
+            prompt={prompt}
+            onGenerate={() => void generate()}
+            onPromptChange={setPrompt}
+          />
+        )}
+      </div>
+      <div className="shrink-0 space-y-3 border-t bg-background px-6 py-4">
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </div>
+    </>
   );
 }

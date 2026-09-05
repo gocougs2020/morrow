@@ -70,6 +70,7 @@ export function MemorySettings({ active = true }: { readonly active?: boolean })
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load memories when the tab is shown
     setLoading(true);
     void refresh()
       .catch((loadError) => {
@@ -216,6 +217,7 @@ function SavedMemoryRow({
   const [deleting, setDeleting] = useState(false);
   const field = useMemoryFieldSizing();
   const savedText = useRef(memory.text);
+  // eslint-disable-next-line react-hooks/refs -- compare against the last persisted text
   savedText.current = memory.text;
 
   useEffect(() => {

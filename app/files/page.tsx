@@ -16,12 +16,16 @@ export default async function FilesPage({
   const query = await searchParams;
   const folderId = Array.isArray(query.folder) ? query.folder[0] : query.folder;
 
+  let library;
   try {
-    return <DocumentsLibrary library={await getDocumentLibrary(session.user.id, folderId)} />;
+    library = await getDocumentLibrary(session.user.id, folderId);
   } catch (error) {
     if (error instanceof DocumentError && error.status === 404) {
-      return <DocumentsLibrary library={await getDocumentLibrary(session.user.id)} />;
+      library = await getDocumentLibrary(session.user.id);
+    } else {
+      throw error;
     }
-    throw error;
   }
+
+  return <DocumentsLibrary library={library} />;
 }

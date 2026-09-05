@@ -13,8 +13,6 @@ import type { ProfileMemory } from "./types";
 export const PROFILE_MEMORY_PREFIX = "eve/memory/profile";
 export const PROFILE_MEMORY_SLOT = "profile";
 export const PROFILE_MEMORY_NAMESPACE = "morrow-profile-v1";
-/** One-time read path for memory written before the Morrow rename. Do not use as a product id. */
-const LEGACY_PROFILE_MEMORY_NAMESPACES = ["travel-agent-squared-profile-v1"] as const;
 export const PROFILE_MEMORY_MAX_ENTRY_BYTES = 2048;
 export const PROFILE_MEMORY_MAX_DOCUMENT_BYTES = 65_536;
 export const PROFILE_MEMORY_MAX_CHARACTERS = 4_000;
@@ -102,7 +100,7 @@ export async function deleteProfileMemory(userId: string, index: number): Promis
 }
 
 function createProfileMemoryBackend(): MemoryDocumentBackend {
-  if (useVercelBlobStore()) {
+  if (vercelBlobStoreEnabled()) {
     return vercelBlob({
       prefix: PROFILE_MEMORY_PREFIX,
       storeId: process.env.BLOB_STORE_ID || process.env.VERCEL_BLOB_STORE_ID,
@@ -112,7 +110,7 @@ function createProfileMemoryBackend(): MemoryDocumentBackend {
   return localProfileMemoryBackend();
 }
 
-function useVercelBlobStore(): boolean {
+function vercelBlobStoreEnabled(): boolean {
   return Boolean(
     process.env.BLOB_READ_WRITE_TOKEN ||
       process.env.BLOB_STORE_ID ||
@@ -284,11 +282,8 @@ function legacyProfileMemoryKeys(userId: string): string[] {
   };
 
   add(PROFILE_MEMORY_NAMESPACE, "local-dev");
-  for (const namespace of LEGACY_PROFILE_MEMORY_NAMESPACES) {
-    for (const scope of scopes) add(namespace, scope);
-  }
   for (const appRoot of [process.cwd(), ""]) {
-    for (const node of [ROOT_NODE_ID, "travel-agent-squared", "morrow", "agent"]) {
+    for (const node of [ROOT_NODE_ID, "morrow", "agent"]) {
       const namespace = defaultNamespace({
         appRoot,
         node,

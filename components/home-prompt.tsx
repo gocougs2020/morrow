@@ -2,7 +2,7 @@
 
 import type { ChatStatus } from "ai";
 import { ArrowUpIcon, CheckIcon, MicIcon, PlusIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { AttachmentGallery } from "@/components/attachment-gallery";
 import {
   PromptInput,
@@ -23,6 +23,7 @@ import {
 import { PromptSkillInput } from "@/components/prompt-skill-input";
 import { Spinner } from "@/components/ui/spinner";
 import { appConfig } from "@/app.config";
+import { cn } from "@/lib/utils";
 
 type VoiceState = "idle" | "listening" | "transcribing";
 
@@ -174,12 +175,21 @@ export function HomePrompt({
   const [voice, setVoice] = useState<VoiceState>("idle");
   const [voiceError, setVoiceError] = useState<string>();
   const [stream, setStream] = useState<MediaStream>();
-  const [desktopAutofocus, setDesktopAutofocus] = useState(false);
+  const desktopAutofocus = useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia("(pointer: fine)");
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia("(pointer: fine)").matches,
+    () => false,
+  );
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const cancelledRef = useRef(false);
   const streamRef = useRef<MediaStream | undefined>(undefined);
+  // eslint-disable-next-line react-hooks/refs -- keep the latest media stream for cleanup
   streamRef.current = stream;
 
   const stopStream = (media?: MediaStream) => {
@@ -189,10 +199,6 @@ export function HomePrompt({
     streamRef.current = undefined;
     setStream(undefined);
   };
-
-  useEffect(() => {
-    setDesktopAutofocus(window.matchMedia("(pointer: fine)").matches);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -313,13 +319,47 @@ export function HomePrompt({
   };
 
   const listening = voice !== "idle";
+  const [fileDragDepth, setFileDragDepth] = useState(0);
+
+  useEffect(() => {
+    const preventWindowFileOpen = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types?.includes("Files")) {
+        event.preventDefault();
+      }
+    };
+    const onWindowDrop = (event: globalThis.DragEvent) => {
+      preventWindowFileOpen(event);
+      setFileDragDepth(0);
+    };
+    document.addEventListener("dragover", preventWindowFileOpen);
+    document.addEventListener("drop", onWindowDrop);
+    return () => {
+      document.removeEventListener("dragover", preventWindowFileOpen);
+      document.removeEventListener("drop", onWindowDrop);
+    };
+  }, []);
+
+  const isFileDrag = (event: DragEvent) => event.dataTransfer.types.includes("Files");
 
   return (
     <div className="flex w-full flex-col gap-2">
       <PromptInput
-        className="[&_[data-slot=input-group]]:h-auto [&_[data-slot=input-group]]:overflow-visible [&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:px-1 [&_[data-slot=input-group]]:pt-0.5 [&_[data-slot=input-group]]:shadow-sm"
-        globalDrop
+        className={cn(
+          "[&_[data-slot=input-group]]:h-auto [&_[data-slot=input-group]]:overflow-visible [&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:px-1 [&_[data-slot=input-group]]:pt-0.5 [&_[data-slot=input-group]]:shadow-sm",
+          fileDragDepth > 0 &&
+            "[&_[data-slot=input-group]]:border-foreground/30 [&_[data-slot=input-group]]:bg-accent/40",
+        )}
         multiple
+        onDragEnter={(event) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          setFileDragDepth((depth) => depth + 1);
+        }}
+        onDragLeave={(event) => {
+          if (!isFileDrag(event)) return;
+          setFileDragDepth((depth) => Math.max(0, depth - 1));
+        }}
+        onDrop={() => setFileDragDepth(0)}
         onSubmit={(message) => {
           if (listening || submitting) return;
           onSubmit(message);

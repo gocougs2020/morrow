@@ -9,9 +9,8 @@ import {
 } from "@/lib/access";
 import { getNeonDb, getSqliteDb, hasNeon } from "@/lib/db";
 import { pgAuthSchema, sqliteAuthSchema } from "@/lib/db/schema";
+import { authOrigins } from "@/lib/auth-origins";
 import { findUserById } from "@/lib/email-users";
-
-const allowedHosts = ["localhost:*", "127.0.0.1:*", "*.vercel.app"];
 
 export class MissingAuthSecretError extends Error {
   constructor() {
@@ -38,20 +37,19 @@ function emailFromUnknown(value: unknown): string {
 
 function createAuth() {
   const secret = requireAuthSecret();
-  const fallbackBaseURL = process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000";
+  const { hosts, origins, fallback } = authOrigins();
 
   const shared = {
     secret,
     baseURL: {
-      allowedHosts,
-      fallback: fallbackBaseURL,
+      allowedHosts: hosts,
+      fallback,
     },
-    trustedOrigins: [
-      "http://localhost:*",
-      "http://127.0.0.1:*",
-      "https://*.vercel.app",
-    ],
-    emailAndPassword: { enabled: true },
+    trustedOrigins: origins,
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+    },
     plugins: [nextCookies()],
     hooks: {
       before: createAuthMiddleware(async (ctx) => {

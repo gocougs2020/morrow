@@ -9,6 +9,7 @@ import {
   searchUserLibrary,
   toClientDocument,
 } from "@/lib/documents";
+import { DocumentUploadError, assertDocumentByteLength, assertDocumentUpload } from "@/lib/document-upload";
 import { listFolders } from "@/lib/store";
 import { isResourceVisibility } from "@/lib/visibility";
 
@@ -54,10 +55,16 @@ export async function POST(request: Request) {
       const folderId = parseOptionalFolderId(form.get("folderId"));
       const isPublic = form.get("isPublic") === "true";
       const visibilityValue = String(form.get("visibility") ?? "");
+      if (file instanceof File) {
+        assertDocumentUpload({ name: file.name, size: file.size, type: file.type });
+      }
       const content =
         file instanceof File
           ? Buffer.from(await file.arrayBuffer())
           : String(form.get("content") ?? "");
+      if (!(file instanceof File)) {
+        assertDocumentByteLength(Buffer.byteLength(content));
+      }
       const document = await createUserDocument(session.user.id, {
         chatId,
         content,
@@ -86,6 +93,7 @@ export async function POST(request: Request) {
       chatId?: string;
       folderId?: string | null;
     };
+    assertDocumentByteLength(Buffer.byteLength(body.content ?? ""));
     const document = await createUserDocument(session.user.id, {
       chatId: body.chatId,
       content: body.content ?? "",
@@ -100,7 +108,7 @@ export async function POST(request: Request) {
     const folders = await listFolders(session.user.id);
     return NextResponse.json({ document: toClientDocument(document, folders, session.user.id) });
   } catch (documentError) {
-    if (documentError instanceof DocumentError) {
+    if (documentError instanceof DocumentError || documentError instanceof DocumentUploadError) {
       return NextResponse.json({ error: documentError.message }, { status: documentError.status });
     }
     throw documentError;

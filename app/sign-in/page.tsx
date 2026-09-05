@@ -1,13 +1,19 @@
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { firstSearchParam } from "@/lib/auth-form";
 import { getSession } from "@/lib/session";
+import { getSetupStatus } from "@/lib/setup-status";
 
 export default async function SignInPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{ readonly error?: string | string[] }>;
 }) {
+  await connection();
+  if (!getSetupStatus().authSecret) {
+    redirect("/");
+  }
   if (await getSession()) {
     redirect("/");
   }
