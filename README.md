@@ -1,5 +1,7 @@
 # Morrow
 
+[![CI](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml)
+
 A deployable workspace for [eve](https://eve.dev) agents. Fork, configure, and deploy. Next.js web chat, Better Auth, Neon (or local SQLite), AI Gateway models, skills, memory, files, and scheduled jobs. Don’t wait for tomorrow—deploy with Morrow
 
 MIT licensed. First public version is **0.1.0** — bump `package.json` when you tag the next release. See [CHANGELOG.md](./CHANGELOG.md) if you forked and are pulling updates, plus [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md).
