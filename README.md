@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml)
 
-Morrow is an opinionated but flexible workspace for [eve](https://eve.dev) agents. One deploy is one team workspace: files, sessions, memory, inbox, and usage are designed a certain way. Models, skills, connections, and instructions are yours to change.
+Morrow is an opinionated but flexible workspace for [eve](https://eve.dev) AI agents. One deploy is one team workspace: files, sessions, memory, inbox, and usage are designed a certain way. Models, skills, connections, and instructions are yours to change.
 
 Fork, configure, and deploy. Next.js web chat, Better Auth, Neon (or local SQLite), AI Gateway models, skills, memory, files, and scheduled jobs. Don’t wait for tomorrow—deploy today with Morrow.
 
