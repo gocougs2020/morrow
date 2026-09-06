@@ -14,6 +14,7 @@ export type SetupStatus = {
   hosted: boolean;
   voice: boolean;
   inbox: boolean;
+  accountUsage: boolean;
   canWriteLocalEnv: boolean;
 };
 
@@ -55,6 +56,7 @@ export function getSetupStatus(): SetupStatus {
     hosted,
     voice: hasText(process.env.OPENAI_API_KEY),
     inbox: hasText(process.env.RESEND_API_KEY) && hasText(process.env.RESEND_FROM_EMAIL),
+    accountUsage: hasText(process.env.ALLOWED_ACCOUNT_USAGE_EMAILS),
     canWriteLocalEnv: canWriteLocalEnv(),
   };
 }

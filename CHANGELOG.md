@@ -6,6 +6,11 @@ When you pull `main`, keep your customized [`app.config.ts`](./app.config.ts) �
 
 The matching git tag is the baseline to sync against. Bump `package.json` when you tag the next release.
 
+## Unreleased
+
+- Signed-in workspace setup at `/settings/setup` (Settings → Setup). Hide with `setup.inAppPage` in `app.config.ts`, or delete the isolated page files listed in the README.
+- README leads with the Vercel Deploy button, plus home and session-canvas screenshots.
+
 ## 0.1.0 — 2026-09-05
 
 First public version (`v0.1.0`).

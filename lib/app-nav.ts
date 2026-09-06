@@ -1,3 +1,5 @@
+import { isInAppSetupEnabled } from "@/lib/in-app-setup";
+
 export type AppNavItem = {
   href: string;
   label: string;
@@ -10,7 +12,7 @@ export const appHeaderNavItems: readonly AppNavItem[] = [
   { href: "/files", label: "Files", prefetch: false },
 ];
 
-export const appAccountNavItems: readonly AppNavItem[] = [
+const accountNavBase: readonly AppNavItem[] = [
   { href: "/", label: "Home" },
   { href: "/inbox", label: "Inbox", prefetch: false },
   { href: "/files", label: "Files", prefetch: false },
@@ -18,8 +20,21 @@ export const appAccountNavItems: readonly AppNavItem[] = [
   { href: "/settings", label: "Settings", prefetch: false },
 ];
 
+const setupNavItem: AppNavItem = {
+  href: "/settings/setup",
+  label: "Setup",
+  prefetch: false,
+};
+
+export function getAppAccountNavItems(): readonly AppNavItem[] {
+  if (!isInAppSetupEnabled()) return accountNavBase;
+  return [...accountNavBase, setupNavItem];
+}
+
+export const appAccountNavItems = getAppAccountNavItems();
+
 export function isAppNavActive(pathname: string, href: string): boolean {
-  return href === "/"
-    ? pathname === "/"
-    : pathname === href || pathname.startsWith(`${href}/`);
+  if (href === "/") return pathname === "/";
+  if (href === "/settings") return pathname === "/settings";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }

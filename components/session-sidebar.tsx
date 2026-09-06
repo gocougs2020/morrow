@@ -27,7 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { appAccountNavItems, isAppNavActive } from "@/lib/app-nav";
+import { getAppAccountNavItems, isAppNavActive } from "@/lib/app-nav";
 import { authClient } from "@/lib/auth-client";
 import { APP_NAME } from "@/lib/brand";
 import type { ChatRecord } from "@/lib/types";
@@ -331,7 +331,7 @@ function SidebarAccountNav({
       >
         <CollapsibleContent className="max-h-[40dvh] overflow-y-auto px-1 pt-1">
           <nav className="flex flex-col">
-            {appAccountNavItems.map((item) => {
+            {getAppAccountNavItems().map((item) => {
               const active = isAppNavActive(pathname, item.href);
               return (
                 <Link

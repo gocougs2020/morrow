@@ -20,6 +20,7 @@ const SETUP_ENV_KEYS = [
   "OPENAI_API_KEY",
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
+  "ALLOWED_ACCOUNT_USAGE_EMAILS",
   "VERCEL",
   "NODE_ENV",
 ] as const;
@@ -83,6 +84,7 @@ describe("getSetupStatus", () => {
     expect(status.hosted).toBe(false);
     expect(status.voice).toBe(false);
     expect(status.inbox).toBe(false);
+    expect(status.accountUsage).toBe(false);
     expect(status.canWriteLocalEnv).toBe(true);
     expect(isSetupScreenVisible(status)).toBe(true);
   });
@@ -121,6 +123,11 @@ describe("getSetupStatus", () => {
   it("hides the setup screen once an allowlist domain is set", () => {
     process.env.ALLOWED_SIGNUP_DOMAINS = "example.com";
     expect(isSetupScreenVisible()).toBe(false);
+  });
+
+  it("marks account usage when ALLOWED_ACCOUNT_USAGE_EMAILS is set", () => {
+    process.env.ALLOWED_ACCOUNT_USAGE_EMAILS = "you@example.com";
+    expect(getSetupStatus().accountUsage).toBe(true);
   });
 });
 

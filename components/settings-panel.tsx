@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PencilIcon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { InstructionPrompt } from "@/components/instruction-prompt";
@@ -34,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BuiltinSkillDoc } from "@/lib/app-config";
 import { markdownToSafeHtml } from "@/lib/markdown-document";
+import { isInAppSetupEnabled } from "@/lib/in-app-setup";
 import { parseSettingsTab, type SettingsTab } from "@/lib/settings-tab";
 import { skillDisplayName } from "@/lib/skill-display-name";
 import type { ScheduledJob, UserSettings, UserSkill } from "@/lib/types";
@@ -175,11 +177,22 @@ export function SettingsPanel({
     <div className="flex min-h-dvh flex-col bg-background pb-[env(safe-area-inset-bottom)]">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 py-8" id="main" tabIndex={-1}>
-        <div>
-          <h1 className="text-pretty font-medium text-2xl tracking-tight">Settings</h1>
-          <p className="text-muted-foreground text-sm">
-            Configure instructions, skills, memory, schedules, and view connections.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-pretty font-medium text-2xl tracking-tight">Settings</h1>
+            <p className="text-muted-foreground text-sm">
+              Configure instructions, skills, memory, schedules, and view connections.
+            </p>
+          </div>
+          {isInAppSetupEnabled() ? (
+            <Link
+              className="text-muted-foreground text-sm underline hover:text-foreground"
+              href="/settings/setup"
+              prefetch={false}
+            >
+              Workspace setup
+            </Link>
+          ) : null}
         </div>
         <Tabs
           value={activeTab}

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { appHeaderNavItems, isAppNavActive } from "@/lib/app-nav";
+import { isInAppSetupEnabled } from "@/lib/in-app-setup";
 import { authClient } from "@/lib/auth-client";
 import { APP_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,13 @@ export function AppHeader({
                     Settings
                   </Link>
                 </DropdownMenuItem>
+                {isInAppSetupEnabled() ? (
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings/setup" prefetch={false}>
+                      Setup
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
               </DropdownMenuGroup>
               <ThemeAppearanceMenu />
               <DropdownMenuSeparator />

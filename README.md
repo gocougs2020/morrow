@@ -2,30 +2,76 @@
 
 [![CI](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml)
 
-A deployable workspace for [eve](https://eve.dev) agents. Fork, configure, and deploy. Next.js web chat, Better Auth, Neon (or local SQLite), AI Gateway models, skills, memory, files, and scheduled jobs. Don’t wait for tomorrow—deploy with Morrow
+Morrow is an opinionated but flexible workspace for [eve](https://eve.dev) agents. One deploy is one team workspace: files, sessions, memory, inbox, and usage are designed a certain way. Models, skills, connections, and instructions are yours to change.
 
-MIT licensed. First public version is **0.1.0** — bump `package.json` when you tag the next release. See [CHANGELOG.md](./CHANGELOG.md) if you forked and are pulling updates, plus [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md).
+Fork, configure, and deploy. Next.js web chat, Better Auth, Neon (or local SQLite), AI Gateway models, skills, memory, files, and scheduled jobs. Don’t wait for tomorrow—deploy today with Morrow.
+
+MIT licensed. Current tag is **0.1.0** — bump `package.json` when you tag the next release. See [CHANGELOG.md](./CHANGELOG.md) if you forked and are pulling updates, plus [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md).
 
 Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who can sign in live in environment variables.
 
-**How to hide the setup screen.** Until you set `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`, the home page is a setup checklist — locally and on the live site. Completing the other steps (secret, Gateway, Neon, Blob) does not dismiss it. Add your email or a company domain, restart `npm run dev` (or redeploy on Vercel), and the checklist is gone. See [step 8](#8-lock-who-can-sign-in-do-this-last).
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Morrow home: skill chips and a /write prompt" width="880" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/session-canvas.png" alt="A session with a live HTML file canvas beside the chat" width="880" />
+</p>
+
+## Features
+
+- Durable sessions with stable URLs (eve)
+- First-prompt model routing (AI Gateway)
+- Durable and scalable memory (sticky notes + embeddings)
+- Voice-to-text input (gpt-transcribe from OpenAI)
+- Native files storage (Vercel Blob; “Dropbox-lite”)
+- Inbox for agent mail (send and receive via Resend)
+- Built-in and user-authored skills (eve skills)
+- Slash-command skill invoke (`/slug`)
+- Scheduled jobs (eve schedules)
+- Installable PWA (Add to Home Screen)
+- Session file canvas (files beside the chat)
+- Automatic context compaction (eve)
+- User vs Account usage+cost dashboard (token and cost ledger)
+- Related-session citations (embeddings)
+- Custom instruction overlay (per-user, on top of agent instructions)
+- Signup allowlist (env emails and domains)
+- One-file product config (`app.config.ts`)
+
+**How to hide the home setup screen.** Until you set `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`, the home page is a setup checklist — locally and on the live site. Completing the other steps (secret, Gateway, Neon, Blob) does not dismiss it. Add your email or a company domain, restart `npm run dev` (or redeploy on Vercel), and that home-page checklist is gone. See [Lock who can sign in](#lock-who-can-sign-in). After you sign in, **Settings → Setup** still shows what’s left (voice, Inbox, and any unfinished host settings). To hide or delete that signed-in page, see [Remove the in-app setup page](#remove-the-in-app-setup-page).
 
 ## Quick start
 
-This section is the whole path from a copy of the repo to a live workspace on the internet. You do not need to be a programmer. You will create a few free accounts, copy and paste a handful of commands, and follow an on-screen list.
+**Deploy on Vercel** is the fastest path to a live workspace. Run it on your computer if you want to change the code first. Import the repo yourself if you already forked and do not want the Deploy button.
 
-You need about 20 minutes, a [GitHub](https://github.com/signup) account, and a [Vercel](https://vercel.com/signup) account (both free).
+You need a [GitHub](https://github.com/signup) account and a [Vercel](https://vercel.com/signup) account (both free). About 10 minutes for the Deploy button.
 
 **Settings files in one sentence.** Private values (passwords, API keys, who may sign in) are not stored in the public code. On your computer they go in a file named `.env.local`. On the live site they go in Vercel → your project → **Settings → Environment Variables**. The on-screen checklist watches those settings and checks off each step.
 
-### 1. Install two tools
+### Deploy on Vercel (recommended)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow&project-name=morrow&repository-name=morrow&env=BETTER_AUTH_SECRET%2CBETTER_AUTH_URL%2CALLOWED_SIGNUP_EMAILS&envDescription=BETTER_AUTH_SECRET%3A+32%2B+random+characters.+BETTER_AUTH_URL%3A+your+live+origin+including+https%3A%2F%2F+%28https%3A%2F%2FYOUR-PROJECT.vercel.app%29.+ALLOWED_SIGNUP_EMAILS%3A+your+email+-+hides+the+setup+page+and+blocks+strangers+from+using+your+models.&envLink=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow%23environment-variables&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%2C%22allowConnectExistingProduct%22%3Atrue%7D%2C%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22private%22%7D%5D)
+
+The button copies this repo into your GitHub account and creates a Vercel project. The wizard asks you to type three values (it cannot fill secrets for you — they would sit in the browser history) and offers Neon plus private Blob:
+
+| Name | What to type |
+| --- | --- |
+| `BETTER_AUTH_SECRET` | 32+ random characters. Treat it like a password; do not commit it. |
+| `BETTER_AUTH_URL` | Your live origin, including `https://`. Use `https://YOUR-PROJECT.vercel.app` (the project name you pick, default `morrow`) or your custom domain. You can fix this in Settings after the first deploy if the URL is not known yet. |
+| `ALLOWED_SIGNUP_EMAILS` | Your email. This hides the setup checklist and stops strangers from spending your model budget. |
+
+Accept Neon and **private** Blob when offered. A linked Vercel project can call models with OIDC, so you do not have to paste `AI_GATEWAY_API_KEY` here.
+
+After deploy, open the site URL. If you set `ALLOWED_SIGNUP_EMAILS`, create your account and you are in. If you skipped a store or an env field, finish [Import the repo yourself](#import-the-repo-yourself) and redeploy.
+
+You can also deploy from a terminal after `npm install` — see [Deploy to Vercel](#deploy-to-vercel).
+
+### Run it on your computer
 
 1. **Node.js 24** — download the installer whose version starts with **24** from [nodejs.org](https://nodejs.org). This also installs `npm`.
-2. **Git** (optional if you download a ZIP in the next step) — [git-scm.com/downloads](https://git-scm.com/downloads).
+2. **Git** (optional if you download a ZIP) — [git-scm.com/downloads](https://git-scm.com/downloads).
 
 On a Mac, open **Terminal** (Applications → Utilities → Terminal). On Windows, open **Terminal** or **PowerShell**.
-
-### 2. Copy the project to your computer
 
 **Easiest:** open [github.com/gocougs2020/morrow](https://github.com/gocougs2020/morrow), click **Fork** (top right) so you have your own copy, then click the green **Code** button → **Download ZIP**. Unzip the folder. In Terminal, type `cd ` (with a space), drag the unzipped folder onto the window, and press Return.
 
@@ -62,87 +108,42 @@ Start the app:
 npm run dev
 ```
 
-Leave that window open. Open [http://localhost:3000](http://localhost:3000) in your browser. You should see **Set up your workspace** — a checklist. The rest of these steps match that list. Click **Refresh** on the page after you add a setting (if you edited `.env.local` yourself, press Ctrl+C in Terminal, run `npm run dev` again, then Refresh).
+Leave that window open. Open [http://localhost:3000](http://localhost:3000) in your browser. You should see **Set up your workspace** — a checklist. Click **Refresh** on the page after you add a setting (if you edited `.env.local` yourself, press Ctrl+C in Terminal, run `npm run dev` again, then Refresh).
 
-### 3. Create a sign-in secret
+**Sign-in secret.** On the setup page, click **Generate secret**, then **Copy**. Click **Save to this computer**, or paste `BETTER_AUTH_SECRET=` plus the value into `.env.local`. Do not commit it.
 
-On the setup page, click **Generate secret**, then **Copy**.
-
-- **On this computer:** click **Save to this computer**, or paste this line into `.env.local` (open it with TextEdit, Notepad, or any editor):
-
-  `BETTER_AUTH_SECRET=` plus the generated value.
-
-- **On Vercel (later):** Settings → Environment Variables → add `BETTER_AUTH_SECRET` with the same value.
-
-You do not need to memorize this value. Treat it like a password: do not commit it to GitHub.
-
-### 4. Add an AI Gateway key
-
-The agent needs a Vercel AI Gateway key to call models.
+**AI Gateway key.** The agent needs a Vercel AI Gateway key to call models locally.
 
 1. Sign up at [vercel.com/signup](https://vercel.com/signup) if you do not have an account.
 2. Create a key at [AI Gateway API keys](https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%2Fapi-keys&title=Get%20your%20AI%20Gateway%20key).
 3. In `.env.local`, put it on the `AI_GATEWAY_API_KEY=` line. Restart `npm run dev` and Refresh the checklist.
 
-On Vercel, a linked project can use OIDC instead of pasting this key.
+On a linked Vercel project, OIDC can replace this key.
 
-### 5. Put the app on the internet (Vercel)
+Then [lock who can sign in](#lock-who-can-sign-in) so the checklist leaves the home page.
 
-You need your own GitHub copy so Vercel can deploy it.
+### Import the repo yourself
+
+Use this if you forked and imported on [vercel.com/new](https://vercel.com/new) instead of the Deploy button. Skip any step the wizard already completed.
 
 1. Fork [github.com/gocougs2020/morrow](https://github.com/gocougs2020/morrow) if you have not already.
-2. Open [vercel.com/new](https://vercel.com/new), sign in with GitHub, and **Import** your fork.
-3. Deploy. Copy the site URL (it looks like `https://something.vercel.app`).
-4. In that Vercel project → **Settings → Environment Variables**, add at least:
+2. Open [vercel.com/new](https://vercel.com/new), sign in with GitHub, and **Import** your fork. Deploy and copy the site URL (it looks like `https://something.vercel.app`).
+3. In that Vercel project → **Settings → Environment Variables**, add at least:
 
    | Name | Value |
    | --- | --- |
-   | `BETTER_AUTH_SECRET` | The secret from step 3 |
+   | `BETTER_AUTH_SECRET` | 32+ random characters |
    | `BETTER_AUTH_URL` | Your live URL, including `https://` |
    | `AI_GATEWAY_API_KEY` | Your Gateway key (skip if you rely on OIDC) |
+   | `ALLOWED_SIGNUP_EMAILS` | Your email (or set `ALLOWED_SIGNUP_DOMAINS` instead) |
 
-5. Redeploy (Deployments → ⋯ → Redeploy) so those settings take effect.
+4. **Neon** — Storage → Create Database → Neon, or [Neon on the Vercel Marketplace](https://vercel.com/marketplace/neon). Vercel adds `DATABASE_URL`. The live site needs this so accounts and chats survive deploys. Locally a file under `.data/` is used instead.
+5. **Blob** — Storage → Create → Blob, **private**. Vercel adds `BLOB_READ_WRITE_TOKEN`. Uploads and some memory notes need this on the live site.
+6. Redeploy (Deployments → ⋯ → Redeploy) so those settings take effect.
 
-**Easier:** [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow&project-name=morrow&repository-name=morrow&env=BETTER_AUTH_SECRET%2CBETTER_AUTH_URL%2CALLOWED_SIGNUP_EMAILS&envDescription=BETTER_AUTH_SECRET%3A+32%2B+random+characters.+BETTER_AUTH_URL%3A+your+live+origin+including+https%3A%2F%2F+%28https%3A%2F%2FYOUR-PROJECT.vercel.app%29.+ALLOWED_SIGNUP_EMAILS%3A+your+email+-+hides+the+setup+page+and+blocks+strangers+from+using+your+models.&envLink=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow%23environment-variables&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%2C%22allowConnectExistingProduct%22%3Atrue%7D%2C%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22private%22%7D%5D) copies the repo into your GitHub account and creates a Vercel project. The wizard asks you to type three values (it cannot fill secrets for you — they would sit in the browser history) and offers Neon plus private Blob:
+The **Put the app on Vercel** checkbox on the setup page turns green when you open the live site (not localhost).
 
-| Name | What to type |
-| --- | --- |
-| `BETTER_AUTH_SECRET` | 32+ random characters (the secret from step 3, or generate a new one) |
-| `BETTER_AUTH_URL` | Your live origin, including `https://`. Use `https://YOUR-PROJECT.vercel.app` (the project name you pick, default `morrow`) or your custom domain. You can fix this in Settings after the first deploy if the URL is not known yet. |
-| `ALLOWED_SIGNUP_EMAILS` | Your email. This hides the setup checklist and stops strangers from spending your model budget. |
-
-Accept Neon and **private** Blob when offered. A linked Vercel project can call models with OIDC, so you do not have to paste `AI_GATEWAY_API_KEY` here. After deploy, open the site URL. If you skipped a store or an env field, finish steps 6–8 and redeploy.
-
-You can also deploy from a terminal after `npm install`:
-
-```bash
-npx eve deploy --non-interactive --yes --project your-project-name
-```
-
-The **Put the app on Vercel** checkbox turns green when you open the live site (not localhost).
-
-### 6. Add a Neon database
-
-Skip this if the Deploy button already created Neon.
-
-On your computer the app can store data in a local file. The live site needs a database so accounts and chats survive deploys.
-
-1. Open your Vercel project → **Storage → Create Database → Neon**.
-2. Or install [Neon on the Vercel Marketplace](https://vercel.com/marketplace/neon).
-3. Vercel adds `DATABASE_URL` for you. Redeploy after it appears.
-
-### 7. Add file storage (Vercel Blob)
-
-Skip this if the Deploy button already created a **private** Blob store.
-
-Uploads and some memory notes need Blob on the live site. Locally a folder under `.data/` is used instead.
-
-1. Open your Vercel project → **Storage → Create → Blob**.
-2. Vercel adds `BLOB_READ_WRITE_TOKEN`. Redeploy after it appears.
-
-### 8. Lock who can sign in (do this last)
-
-Skip this if you already entered `ALLOWED_SIGNUP_EMAILS` in the Deploy button wizard.
+### Lock who can sign in
 
 This is the only setting that removes the setup screen. Set **at least one** of:
 
@@ -152,7 +153,7 @@ This is the only setting that removes the setup screen. Set **at least one** of:
 Until one of those is set, the checklist stays on `/`, and anyone who finds the URL can create an account and spend your model budget.
 
 - **On this computer:** enter your email on the last checklist item and click **Save and hide this page**. That writes `ALLOWED_SIGNUP_EMAILS` into `.env.local`. Or add the line yourself, stop the app, and run `npm run dev` again.
-- **On Vercel:** Settings → Environment Variables → add the same name and value. Redeploy.
+- **On Vercel:** skip this if you already entered it in the Deploy button wizard. Otherwise Settings → Environment Variables → add the same name and value, then redeploy.
 
 After that, the setup page is gone. Open the site, create your account, and you are in.
 
@@ -165,6 +166,17 @@ When you want to change the product name, home-page chips, or models, edit `app.
 ## After the first deploy
 
 The **Set up your workspace** page on `/` stays up until `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS` is set in that environment (`.env.local` on your computer, Vercel env on the live site). Other completed checklist items do not hide it. Then the home page is signed-in chat.
+
+Signed-in users can still open **Settings → Setup** (`/settings/setup`) to see remaining environment settings — voice (`OPENAI_API_KEY`), Inbox (`RESEND_*`), the Account usage allowlist, and any unfinished host steps. The page never prints secret values.
+
+## Remove the in-app setup page
+
+The signed-in checklist is optional after you are done configuring.
+
+1. **Hide it** — set `setup.inAppPage` to `false` in [`app.config.ts`](./app.config.ts), then restart or redeploy. The route 404s and the Setup links disappear.
+2. **Delete it from the repo** — remove `app/settings/setup/` and `components/workspace-setup.tsx`, drop the `setup` block from `app.config.ts` and `isInAppSetupEnabled` from `lib/in-app-setup.ts` (and its imports), and take the Setup links out of `components/app-header.tsx`, `components/settings-panel.tsx`, and `lib/app-nav.ts`.
+
+Leave `lib/setup-status.ts` and the public checklist on `/` in place. Those still protect a fresh clone until the allowlist is set.
 
 ## What’s included
 
@@ -259,6 +271,16 @@ Chat IDs are AI Gateway strings (`provider/model`). On the first prompt of a ses
 
 If you change a chat model ID, add its context window under `models.contextWindows` (tokens). Unknown IDs fall back to `1_050_000`. Compaction and the session context chip use `min(256_000, 90% of that catalog size)` so a million-token model does not fill its full window.
 
+### In-app setup page
+
+```ts
+setup: {
+  inAppPage: true,
+},
+```
+
+`true` shows **Settings → Setup**. `false` hides the page and its links without deleting files.
+
 ### Related-session memory
 
 ```ts
@@ -329,7 +351,7 @@ ALLOWED_ACCOUNT_USAGE_EMAILS=ada@agency.com
 
 ## Deploy to Vercel
 
-The [Quick start](#quick-start) is the dashboard path (fork on GitHub, import on Vercel, add Neon and Blob from Storage), or the Deploy button there, which prompts for env vars and offers those stores. From a terminal:
+The [Deploy on Vercel](#deploy-on-vercel-recommended) button in Quick start is the usual path: it prompts for env vars and offers Neon plus private Blob. Importing a fork yourself is under [Import the repo yourself](#import-the-repo-yourself). From a terminal after `npm install`:
 
 ```bash
 npx eve deploy --non-interactive --yes --project your-project-name
@@ -356,6 +378,7 @@ HTML responses send a Content-Security-Policy plus `X-Content-Type-Options`, `Re
 | --- | --- |
 | Who can sign up or stay signed in (also hides the setup screen) | `.env.local` / Vercel env (`ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`; optional `BLOCKED_ACCESS_EMAILS`) |
 | Who can see Account usage | `.env.local` / Vercel env (`ALLOWED_ACCOUNT_USAGE_EMAILS`) |
+| Hide the signed-in setup page | `app.config.ts` (`setup.inAppPage`) |
 | Identity, tone, and default workflows | `agent/instructions.md` |
 | Per-user overlay (working style) | Settings → Instructions, or the Settings prompt |
 | Built-in skill steps | `agent/skills/<slug>/SKILL.md` |
@@ -369,11 +392,12 @@ After a content-only instructions or skill change, restart `npm run dev` (or red
 ## Project layout
 
 ```
-app.config.ts          # Brand, home copy, skills, models
+app.config.ts          # Brand, home copy, skills, models, in-app setup flag
 app/                   # Next.js App Router (chat, files, inbox, settings, auth)
 agent/                 # eve agent: instructions, tools, skills, connections
 lib/                   # Shared store, files, auth, helpers
 components/            # UI
+docs/screenshots/      # README previews
 .env.example           # Environment variable template
 LICENSE                # MIT
 ```

@@ -51,6 +51,15 @@ export type AppConfig = {
     hydeTimeoutMs: number;
   };
   skills: Record<string, AppSkillConfig>;
+  setup: {
+    /**
+     * Signed-in checklist at `/settings/setup`. Set to `false` to hide the
+     * page and its nav links. To remove it from the repo, delete
+     * `app/settings/setup/` and `components/workspace-setup.tsx`, then drop
+     * this block and the Setup links (see README).
+     */
+    inAppPage: boolean;
+  };
 };
 
 export const appConfig = {
@@ -172,5 +181,9 @@ export const appConfig = {
       title: "Memory",
       emoji: "🧠",
     },
+  },
+
+  setup: {
+    inAppPage: true,
   },
 } as const satisfies AppConfig;
