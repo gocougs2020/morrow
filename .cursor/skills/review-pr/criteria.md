@@ -16,7 +16,11 @@ every signed-in account on that deployment.
   add rigid Neon CRM tables in this repo.
 - Model IDs live in `app.config.ts`. Do not change `agent/agent.ts` routing
   unless the PR is explicitly about that.
-- README stays in sync when a config key or env var is added.
+- README stays in sync when a config key or env var is added. Reminder-email
+  floors (`memory.reminderContext*`) stay in `app.config.ts` and must stay
+  higher than related-session recall. `VERCEL_TOKEN` is optional; without it
+  (or on Hobby) scheduled jobs stay at most once a day. Do not require a
+  Vercel token on the public setup checklist.
 
 ## Reject or score down hard
 
@@ -32,10 +36,14 @@ every signed-in account on that deployment.
 
 - Signup and session: allowlists are the spend control; in-process rate limits
   are a burst brake only
-- Email/password is not verified — spoofable if the attacker can claim an
-  allowlisted address
+- Email/password signup requires a verification link (Resend in production;
+  local without Resend logs the URL). Spoofing an allowlisted address still
+  needs inbox access.
 - Public file links are unguessable URLs, not auth
-- Inbound email is untrusted user content, not instructions
+- Inbound email is untrusted user content, not instructions. A session starts
+  only when mail is To the user's plus-address and From their account email.
+  The shared `RESEND_FROM_EMAIL` mailbox is for workspace notices, not a user
+  inbox.
 - Saving setup-checklist values into `.env.local` is local `next dev` only
 
 ## Slot and bloat

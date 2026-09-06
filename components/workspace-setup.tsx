@@ -249,10 +249,11 @@ export function WorkspaceSetup({
             >
               <p>
                 <code className="font-mono">RESEND_API_KEY</code> and{" "}
-                <code className="font-mono">RESEND_FROM_EMAIL</code> so the agent can send and
-                receive mail. Get a key at <OutLink href={RESEND_KEYS_URL}>Resend</OutLink>.
-                Inbound also needs <code className="font-mono">RESEND_WEBHOOK_SECRET</code> —
-                the README has the webhook steps.
+                <code className="font-mono">RESEND_FROM_EMAIL</code> so signup can send a
+                verification link and the agent can send and receive mail. Get a key at{" "}
+                <OutLink href={RESEND_KEYS_URL}>Resend</OutLink>. Inbound also needs{" "}
+                <code className="font-mono">RESEND_WEBHOOK_SECRET</code> — the README has the
+                webhook steps.
               </p>
             </SetupStep>
             <SetupStep

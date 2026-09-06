@@ -1,45 +1,17 @@
 import { defineSchedule } from "eve/schedules";
-import { scheduleDispatchMessage } from "../../lib/schedule-prompt";
-import { claimDueJobs, completeJob, releaseJob } from "../../lib/store";
-import eve from "../channels/eve";
+import { dispatchDueJobs, startScheduleSession } from "../../lib/dispatch-jobs";
+import { scheduleDispatcherCron } from "../../lib/vercel-plan";
 
 export default defineSchedule({
-  cron: "* * * * *",
-  run({ to, waitUntil }) {
-    waitUntil(
-      (async () => {
-        const jobs = await claimDueJobs({
-          now: new Date(),
-          limit: 25,
-          leaseForMs: 5 * 60_000,
-        });
-
-        await Promise.all(
-          jobs.map(async (job) => {
-            try {
-              await to(eve, {}).send(
-                scheduleDispatchMessage(job),
-                {
-                  auth: {
-                    authenticator: job.authenticator,
-                    principalId: job.userId,
-                    principalType: "user",
-                    ...(job.issuer ? { issuer: job.issuer } : {}),
-                    attributes: { scheduleId: job.id },
-                  },
-                },
-              );
-              await completeJob(job);
-            } catch (error) {
-              await releaseJob(
-                job,
-                error instanceof Error ? error.message : "Schedule dispatch failed",
-                new Date(Date.now() + 300_000),
-              );
-            }
-          }),
-        );
-      })(),
-    );
+  cron: scheduleDispatcherCron(),
+  async run({ waitUntil }) {
+    // withEve compiles this into a Vercel Cron Job. Await the sweep so the
+    // invocation does not freeze before sessions start; waitUntil is the
+    // eve-documented keep-alive if the runtime parks the handler.
+    // Handoff is POST /eve/v1/session — the eve HTTP channel has no
+    // cross-channel receive() hook.
+    const work = dispatchDueJobs((job, chat) => startScheduleSession(job, chat));
+    waitUntil(work);
+    await work;
   },
 });

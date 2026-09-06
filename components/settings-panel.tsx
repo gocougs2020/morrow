@@ -6,6 +6,7 @@ import { PencilIcon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { InstructionPrompt } from "@/components/instruction-prompt";
 import { MarkdownDocumentEditor } from "@/components/markdown-document-editor";
+import { InboundMailSettings, type InboundMailInfo } from "@/components/inbound-mail-settings";
 import { MemorySettings } from "@/components/memory-settings";
 import { ScheduleRow } from "@/components/schedule-row";
 import { SkillEditorDialog, type SkillDraft } from "@/components/skill-editor-dialog";
@@ -39,10 +40,21 @@ import { isInAppSetupEnabled } from "@/lib/in-app-setup";
 import { parseSettingsTab, type SettingsTab } from "@/lib/settings-tab";
 import { skillDisplayName } from "@/lib/skill-display-name";
 import type { ScheduledJob, UserSettings, UserSkill } from "@/lib/types";
+import type { HostSchedulePlanInfo } from "@/lib/vercel-plan";
 import { cn } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
 const settingsTabTriggerClassName = "flex-none rounded-none border-none px-0 shadow-none";
+
+function isHostSchedulePlan(value: unknown): value is HostSchedulePlanInfo {
+  if (!value || typeof value !== "object") return false;
+  const info = value as Partial<HostSchedulePlanInfo>;
+  return (
+    (info.plan === "hobby" || info.plan === "pro") &&
+    (info.source === "api" || info.source === "default") &&
+    typeof info.allowsSubDaily === "boolean"
+  );
+}
 
 export function SettingsPanel({
   builtinSkills,
@@ -54,6 +66,12 @@ export function SettingsPanel({
   const [activeTab, setActiveTab] = useState(tab);
   const [skills, setSkills] = useState<UserSkill[]>([]);
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
+  const [schedulePlan, setSchedulePlan] = useState<HostSchedulePlanInfo>({
+    plan: "hobby",
+    source: "default",
+    allowsSubDaily: false,
+  });
+  const [inboundMail, setInboundMail] = useState<InboundMailInfo>();
   const [overlay, setOverlay] = useState("");
   const [savedOverlay, setSavedOverlay] = useState("");
   const [overlayPrompt, setOverlayPrompt] = useState("");
@@ -70,13 +88,19 @@ export function SettingsPanel({
           response.ok ? response.json() : { settings: undefined },
         ),
         fetch("/api/skills").then((response) => (response.ok ? response.json() : { skills: [] })),
-        fetch("/api/jobs").then((response) => (response.ok ? response.json() : { jobs: [] })),
+        fetch("/api/jobs").then((response) =>
+          response.ok ? response.json() : { jobs: [], schedulePlan: undefined },
+        ),
       ]);
       const nextOverlay = settingsRes.settings?.instructionOverlay ?? "";
       setOverlay(nextOverlay);
       setSavedOverlay(nextOverlay);
+      if (settingsRes.inboundMail && typeof settingsRes.inboundMail === "object") {
+        setInboundMail(settingsRes.inboundMail as InboundMailInfo);
+      }
       setSkills(skillsRes.skills ?? []);
       setJobs(jobsRes.jobs ?? []);
+      if (isHostSchedulePlan(jobsRes.schedulePlan)) setSchedulePlan(jobsRes.schedulePlan);
     } catch {
       setSkills([]);
       setJobs([]);
@@ -181,7 +205,7 @@ export function SettingsPanel({
           <div>
             <h1 className="text-pretty font-medium text-2xl tracking-tight">Settings</h1>
             <p className="text-muted-foreground text-sm">
-              Configure instructions, skills, memory, schedules, and view connections.
+              Configure instructions, skills, memory, inbox, schedules, and view connections.
             </p>
           </div>
           {isInAppSetupEnabled() ? (
@@ -209,6 +233,9 @@ export function SettingsPanel({
             </TabsTrigger>
             <TabsTrigger className={settingsTabTriggerClassName} value="memory">
               Memory
+            </TabsTrigger>
+            <TabsTrigger className={settingsTabTriggerClassName} value="inbox">
+              Inbox
             </TabsTrigger>
             <TabsTrigger className={settingsTabTriggerClassName} value="schedules">
               Schedules
@@ -241,6 +268,9 @@ export function SettingsPanel({
           </TabsContent>
           <TabsContent value="memory">
             <MemorySettings active={activeTab === "memory"} />
+          </TabsContent>
+          <TabsContent value="inbox">
+            <InboundMailSettings inboundMail={inboundMail} onRotated={setInboundMail} />
           </TabsContent>
           <TabsContent className="space-y-4" value="skills">
             <Card>
@@ -315,13 +345,22 @@ export function SettingsPanel({
             </Card>
           </TabsContent>
           <TabsContent value="schedules">
+            {/* Reminders are one-off jobs that email the user. Later: push
+                notifications, and a dedicated reminders page. */}
             <Card>
               <CardHeader>
                 <CardTitle>Schedules</CardTitle>
                 <CardDescription>
-                  Each run is a skill plus this-run facts. Edit a job to change the prompt or
-                  timing — including AI cadences like the first Tuesday of every other month.
-                  Ask the agent to create one.
+                  Each run opens a session, hidden from Sessions until you include scheduled
+                  runs. Ask the agent or use /remind: a nudge emails you (and may attach one
+                  prior session or file if a tight match is found), a do-job tries the work
+                  first, then the one-off job is deleted. Edit timing — including AI cadences
+                  like the first Tuesday of every other month.
+                  {schedulePlan.allowsSubDaily
+                    ? " This host is on Vercel Pro, so hourly and custom intervals are available."
+                    : schedulePlan.plan === "pro"
+                      ? " Vercel reports Pro, but this deploy still ticks once a day — redeploy to unlock hourly jobs."
+                      : " This host is treated as Vercel Hobby, so jobs may fire at most once a day."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -333,6 +372,7 @@ export function SettingsPanel({
                   jobs.map((job) => (
                     <ScheduleRow
                       key={job.id}
+                      allowsSubDaily={schedulePlan.allowsSubDaily}
                       job={job}
                       onJobChange={(next) => {
                         setJobs((current) =>

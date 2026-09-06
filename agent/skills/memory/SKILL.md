@@ -3,7 +3,9 @@ name: memory
 description: >
   Use when the user states a standing preference, working style, or
   durable fact they want remembered across chats — how they work or
-  how they live — or asks you to remember, forget, or update something.
+  how they live — or asks you to remember, forget, or update a standing
+  fact. Do not use for time-bound reminders ("remind me tomorrow",
+  "remember to buy batteries Friday") — those are /remind.
   Load immediately when the user writes /memory.
 ---
 
@@ -26,6 +28,7 @@ Save one durable fact per call. Phrase it so it still makes sense next month wit
 Do **not** put these in sticky notes:
 
 - A specific person's project, dates, budget, or identity documents — save a file with `create_document`
+- Time-bound reminders ("remind me to fold the clothes at 5", "remember to get a car battery tomorrow") — load `remind`
 - One-off session context ("we're working on the Hendersons right now", "this weekend's dinner")
 - Secrets: passwords, payment data, government ID numbers, access tokens
 - Anything they did not ask to keep and that will not help in later sessions

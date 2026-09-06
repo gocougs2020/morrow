@@ -14,7 +14,7 @@ description: >
 2. Then offer to `create_document` with those structured options as a markdown file. Do not save before they have seen the comparison unless they already asked to file it.
 3. When a decision is made — by the user, a team, or a household — update that file with `read_document` and `update_document` (chosen option and rationale). Create a new file only if they asked for a separate decision note.
 4. Outline next steps: payment or approval, names, required files, and any holds or deadlines.
-5. Offer a reminder via `create_schedule` if a hold, sale, or RSVP is time-sensitive. Pass `skill` `decide` and a brief with the option, file, and deadline — not this procedure.
+5. Offer a reminder if a hold, sale, or RSVP is time-sensitive. Load `remind` for a personal ping or agent follow-through. Pass `skill` `decide` only when this procedure should run again at that time.
 
 ## Quick start
 

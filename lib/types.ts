@@ -5,16 +5,17 @@ export type { ResourceVisibility };
 
 export type ModelTier = "auto" | "low" | "high";
 
-export type ChatSource = "web" | "email" | "text";
+export type ChatSource = "web" | "email" | "text" | "schedule";
 
 export const chatSourceLabels: Record<ChatSource, string> = {
   web: "Web",
   email: "Email",
   text: "Text",
+  schedule: "Schedule",
 };
 
 export function normalizeChatSource(value: unknown): ChatSource {
-  if (value === "email" || value === "text" || value === "web") return value;
+  if (value === "email" || value === "text" || value === "web" || value === "schedule") return value;
   return "web";
 }
 
@@ -47,6 +48,7 @@ export type UserSettings = {
   userId: string;
   modelTier: ModelTier;
   instructionOverlay: string;
+  inboundMailToken: string | null;
 };
 
 export type ProfileMemory = {

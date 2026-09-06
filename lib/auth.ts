@@ -9,6 +9,7 @@ import {
 } from "@/lib/access";
 import { getNeonDb, getSqliteDb, hasNeon } from "@/lib/db";
 import { pgAuthSchema, sqliteAuthSchema } from "@/lib/db/schema";
+import { sendVerificationEmail, VERIFY_EMAIL_EXPIRES_IN_SECONDS } from "@/lib/auth-email";
 import { authOrigins } from "@/lib/auth-origins";
 import { findUserById } from "@/lib/email-users";
 
@@ -49,6 +50,25 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,
+      requireEmailVerification: true,
+      autoSignIn: false,
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: true,
+      autoSignInAfterVerification: true,
+      expiresIn: VERIFY_EMAIL_EXPIRES_IN_SECONDS,
+      sendVerificationEmail: async ({
+        user,
+        url,
+        token,
+      }: {
+        user: { id: string; email: string };
+        url: string;
+        token: string;
+      }) => {
+        await sendVerificationEmail({ user, url, token });
+      },
     },
     plugins: [nextCookies()],
     hooks: {

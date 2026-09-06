@@ -48,7 +48,7 @@ export default defineTool({
     });
     try {
       const user = requireUser(ctx);
-      const chat = await resolveChatForEveSession(user.userId, ctx.session.id);
+      const chat = await resolveChatForEveSession(user.userId, ctx.session.id, user.chatId);
       const tokens = tokensFromUnknownUsage(result.usage);
       const hasTokens = tokens.inputTokens > 0 || tokens.outputTokens > 0;
       await runWithUsageScope({ userId: user.userId, chatId: chat?.id }, () =>

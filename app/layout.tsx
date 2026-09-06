@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import { AppNavigation } from "@/components/app-navigation";
 import { PwaRegister } from "@/components/pwa-register";
+import { SessionFreshness } from "@/components/session-freshness";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WarmAgentClient } from "@/components/warm-agent-client";
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
           <TooltipProvider>
             <AppNavigation />
             <PwaRegister />
+            <SessionFreshness />
             <WarmAgentClient />
             {children}
           </TooltipProvider>

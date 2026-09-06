@@ -69,7 +69,65 @@ export function normalizeSchedulePrompt(prompt: string): string {
   return composeSchedulePrompt(parsed);
 }
 
-export function scheduleDispatchMessage(job: { id: string; prompt: string }): string {
+export const REMIND_SKILL_SLUG = "remind";
+
+export function isNudgeReminderSchedule(prompt: string): boolean {
+  return !parseSchedulePrompt(prompt).skill;
+}
+
+export function isRemindDoSchedule(prompt: string): boolean {
+  return parseSchedulePrompt(prompt).skill === REMIND_SKILL_SLUG;
+}
+
+export function isReminderSchedule(prompt: string): boolean {
+  return isNudgeReminderSchedule(prompt) || isRemindDoSchedule(prompt);
+}
+
+export function scheduleSessionUrl(chatId: string, origin: string): string {
+  return `${origin.replace(/\/$/, "")}/s/${chatId}`;
+}
+
+function reminderSessionLink(options?: { chatId?: string; origin?: string }): string | null {
+  if (options?.chatId && options.origin) {
+    return scheduleSessionUrl(options.chatId, options.origin);
+  }
+  return options?.chatId ? `/s/${options.chatId}` : null;
+}
+
+export function scheduleDispatchMessage(
+  job: { id: string; prompt: string },
+  options?: { chatId?: string; context?: string; origin?: string },
+): string {
+  const link = reminderSessionLink(options);
+  const emailLines = [
+    "Omit `to` on send_email so it goes to the signed-in user's account email. It is sent from their agent address.",
+    "Do not email anyone else. Do not ask questions.",
+    link
+      ? `Include this session link in the email so they can continue: ${link}`
+      : "Include a link to this chat session in the email.",
+  ];
+  if (isNudgeReminderSchedule(job.prompt)) {
+    const context = options?.context?.trim();
+    return [
+      `Personal reminder job ${job.id}.`,
+      "This is an unattended nudge. Write a short reminder in this chat, then call send_email.",
+      "Do not try to complete a physical task. Do not search sessions or files for more context.",
+      context
+        ? `These snippets already passed a tight embedding match. Include only these as optional context in the email. Do not invent related notes.\n\n${context}`
+        : "No prior session or file cleared the reminder match floor. Do not invent related notes.",
+      ...emailLines,
+      job.prompt,
+    ].join("\n\n");
+  }
+  if (isRemindDoSchedule(job.prompt)) {
+    return [
+      `Personal follow-through job ${job.id}.`,
+      "This is an unattended /remind run. Load /remind, search prior sessions and files for this brief, and finish the work only if it is not already done.",
+      "Then call send_email with a short status.",
+      ...emailLines,
+      job.prompt,
+    ].join("\n\n");
+  }
   return [
     `Run scheduled job ${job.id} for this user.`,
     "This is an unattended scheduled run. Load any /skill named in the brief, follow that skill, and complete the work. Do not ask questions.",

@@ -32,6 +32,7 @@ const sessionMemoryProvider = defineMemoryProvider({
           response,
           turnId: ctx.turn.id,
           userId: user.userId,
+          chatId: user.chatId,
         });
       } catch (error) {
         console.error("[session-memory] capture failed", error);
@@ -43,7 +44,7 @@ const sessionMemoryProvider = defineMemoryProvider({
 async function recallForTurn(ctx: SessionContext, prompt: string) {
   try {
     const user = requireUser(ctx);
-    const chat = await resolveChatForEveSession(user.userId, ctx.session.id);
+    const chat = await resolveChatForEveSession(user.userId, ctx.session.id, user.chatId);
     const { citations, content } = await recallRelatedSessions(user.userId, prompt, {
       excludeChatId: chat?.id,
     });

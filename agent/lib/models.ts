@@ -106,7 +106,7 @@ export async function assessPromptRoute(text: string): Promise<SessionChatRoute>
  */
 export async function resolveSessionModelSelection(
   messages: readonly ModelMessage[],
-  attribution?: { readonly eveSessionId?: string; readonly userId?: string },
+  attribution?: { readonly eveSessionId?: string; readonly userId?: string; readonly chatId?: string },
 ) {
   const locked = sessionChatRoute.get();
   if (locked) return modelSelectionForRoute(locked);
@@ -117,7 +117,7 @@ export async function resolveSessionModelSelection(
   const userId = attribution?.userId;
   const chat =
     userId && attribution.eveSessionId
-      ? await resolveChatForEveSession(userId, attribution.eveSessionId)
+      ? await resolveChatForEveSession(userId, attribution.eveSessionId, attribution.chatId)
       : null;
   const route = userId
     ? await runWithUsageScope({ userId, chatId: chat?.id }, () => assessPromptRoute(text))

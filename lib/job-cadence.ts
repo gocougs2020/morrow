@@ -219,6 +219,25 @@ export function scheduleFieldsFromCadence(cadence: JobCadence, from = new Date()
   };
 }
 
+export function onceCadenceFromInstant(iso: string, timeZone = defaultTimeZone()): JobCadence {
+  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  const date = parseInstant(iso);
+  if (!date) {
+    throw new Error("firstRunAt must be an ISO 8601 datetime with offset.");
+  }
+  const parts = clockParts(date, zone);
+  return { kind: "once", timezone: zone, at: `${parts.date}T${parts.time}` };
+}
+
+export function isOneOffJob(job: {
+  cadence?: JobCadence | null;
+  everyMinutes: number | null;
+}): boolean {
+  const cadence = parseJobCadence(job.cadence);
+  if (cadence) return cadence.kind === "once";
+  return !job.everyMinutes;
+}
+
 export function nextRunAtFromCadence(cadence: JobCadence, from = new Date()): Date | null {
   const normalized = normalizeJobCadence(cadence);
   switch (normalized.kind) {

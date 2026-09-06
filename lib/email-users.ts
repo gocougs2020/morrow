@@ -72,41 +72,12 @@ export async function findUserById(userId: string): Promise<AppUser | null> {
   return rows[0] ?? null;
 }
 
-export function extractUserIdFromRecipients(addresses: readonly string[]): string | null {
-  for (const address of addresses) {
-    const normalized = normalizeEmailAddress(address);
-    const local = normalized.split("@")[0] ?? "";
-    const tagged = local.split("+").at(-1) ?? "";
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(local)) {
-      return local;
-    }
-    if (tagged.startsWith("u-") && tagged.length > 2) {
-      return tagged.slice(2);
-    }
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tagged)) {
-      return tagged;
-    }
-  }
-  return null;
+export function fromMatchesAccount(
+  fromAddress: string | null | undefined,
+  ownerEmail: string | null | undefined,
+): boolean {
+  const from = fromAddress ? normalizeEmailAddress(fromAddress) : "";
+  const owner = ownerEmail ? normalizeEmailAddress(ownerEmail) : "";
+  return Boolean(from && owner && from === owner);
 }
 
-export async function resolveInboxOwner(input: {
-  fromAddress: string;
-  toAddresses: readonly string[];
-}): Promise<AppUser | null> {
-  const fromUser = await findUserByEmail(input.fromAddress);
-  if (fromUser) return fromUser;
-
-  const recipientId = extractUserIdFromRecipients(input.toAddresses);
-  if (recipientId) {
-    const byId = await findUserById(recipientId);
-    if (byId) return byId;
-  }
-
-  for (const address of input.toAddresses) {
-    const user = await findUserByEmail(address);
-    if (user) return user;
-  }
-
-  return null;
-}

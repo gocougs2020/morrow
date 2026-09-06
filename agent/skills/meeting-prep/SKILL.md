@@ -16,7 +16,7 @@ Works for a 1:1, a vendor call, a doctor or school appointment, or a personal co
 2. Build a pre-meeting brief: goals, open questions, anything to review, and a short agenda. Show it in chat first; offer to save a file if they want one.
 3. After the meeting (or when asked), draft a follow-up with decisions, remaining questions, and next dates. Use email shape only if they will send it; otherwise a short note is fine.
 4. Use `draft_email` when the follow-up is an email. Do not send until the user asks and `send_email` is approved.
-5. Offer to create a follow-up job with `create_schedule` if they want a reminder. Pass `skill` `meeting-prep` and a brief with who, when, and the outcome — not this procedure.
+5. Offer a follow-up reminder if they want one. Load `remind` for a personal ping or agent follow-through. Pass `skill` `meeting-prep` only when this procedure should run again at that time.
 
 ## Quick start
 

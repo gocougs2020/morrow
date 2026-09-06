@@ -12,6 +12,14 @@ import {
   useOptionalSessionWorkspace,
   useWorkspaceLinkPending,
 } from "@/components/session-workspace-context";
+import {
+  clearSessionWorkspaceLeft,
+  consumeExplicitSessionOpen,
+  markSessionWorkspaceLeft,
+  readLastLeftAt,
+  sessionIdFromPath,
+  shouldResetStaleSession,
+} from "@/lib/session-freshness";
 import { pushClientUrl, replaceClientUrl, sessionPath } from "@/lib/start-web-session";
 import type { ChatRecord } from "@/lib/types";
 
@@ -23,6 +31,7 @@ type OpenedSession = {
 };
 
 type UrlSync = {
+  readonly replace?: boolean;
   readonly syncUrl?: boolean;
 };
 
@@ -45,7 +54,7 @@ export function SessionWorkspace({
   const activeChatIdRef = useRef<string | undefined>(undefined);
   const openedIdRef = useRef<string | undefined>(undefined);
   const loadingIdRef = useRef<string | undefined>(undefined);
-  const pathChatId = chatIdFromPath(pathname);
+  const pathChatId = sessionIdFromPath(pathname);
   const highlightId = activeChatId ?? pathChatId;
 
   // eslint-disable-next-line react-hooks/refs -- latest active id for async open
@@ -71,8 +80,10 @@ export function SessionWorkspace({
     setActiveChatIdState(undefined);
     setOpened(undefined);
     setLoadingId(undefined);
+    clearSessionWorkspaceLeft();
     if (options?.syncUrl !== false) {
-      pushClientUrl("/s");
+      if (options?.replace) replaceClientUrl("/s");
+      else pushClientUrl("/s");
     }
   }, []);
 
@@ -114,7 +125,7 @@ export function SessionWorkspace({
 
   const syncFromPath = useCallback(
     (nextPathname: string) => {
-      const pathId = chatIdFromPath(nextPathname);
+      const pathId = sessionIdFromPath(nextPathname);
       if (pathId === activeChatIdRef.current) return;
       if (!pathId) {
         resetToNewSession({ syncUrl: false });
@@ -142,6 +153,50 @@ export function SessionWorkspace({
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [syncFromPath]);
+
+  const resetIfStale = useCallback(
+    (explicitOpen = false) => {
+      if (
+        !shouldResetStaleSession({
+          explicitOpen,
+          lastLeftAt: readLastLeftAt(),
+          now: Date.now(),
+          sessionId: sessionIdFromPath(window.location.pathname),
+        })
+      ) {
+        clearSessionWorkspaceLeft();
+        return;
+      }
+      resetToNewSession({ replace: true });
+    },
+    [resetToNewSession],
+  );
+
+  useEffect(() => {
+    // After five minutes away, reopen on a blank session instead of the last chat.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- stale resume swaps the workspace pane
+    resetIfStale(consumeExplicitSessionOpen());
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        markSessionWorkspaceLeft();
+        return;
+      }
+      resetIfStale();
+    };
+    const onPageHide = () => markSessionWorkspaceLeft();
+    const onPageShow = () => resetIfStale();
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      markSessionWorkspaceLeft();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [resetIfStale]);
 
   const registerCancel = useCallback((cancel: CancelSession) => {
     cancelRef.current = cancel;
@@ -213,12 +268,6 @@ export function SessionWorkspace({
       </div>
     </SessionWorkspaceContext.Provider>
   );
-}
-
-function chatIdFromPath(pathname: string): string | undefined {
-  if (!pathname.startsWith("/s/")) return undefined;
-  const id = pathname.slice(3);
-  return id.length > 0 ? id : undefined;
 }
 
 function mergeChatLists(current: ChatRecord[], incoming: ChatRecord[]): ChatRecord[] {

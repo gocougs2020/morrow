@@ -2,7 +2,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { appConfig } from "@/app.config";
 import { recordGenerateTextUsage } from "@/lib/record-usage";
-import { titleFromPrompt } from "@/lib/store-json";
+import { titleFromPrompt } from "@/lib/store-logic";
 
 const titleModel = appConfig.models.sessionTitle;
 const sessionSummarySchema = z.object({

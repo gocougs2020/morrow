@@ -4,7 +4,13 @@ import { COMPACTION_MODEL, resolveSessionModelSelection } from "./lib/models";
 function attributionFrom(ctx: {
   readonly session: {
     readonly id: string;
-    readonly auth: { readonly current?: { principalId?: string | null; principalType?: string | null } | null };
+    readonly auth: {
+      readonly current?: {
+        principalId?: string | null;
+        principalType?: string | null;
+        attributes?: Record<string, unknown> | null;
+      } | null;
+    };
   };
 }) {
   const auth = ctx.session.auth.current;
@@ -12,6 +18,7 @@ function attributionFrom(ctx: {
     eveSessionId: ctx.session.id,
     userId:
       auth?.principalType === "user" && auth.principalId ? auth.principalId : undefined,
+    chatId: typeof auth?.attributes?.chatId === "string" ? auth.attributes.chatId : undefined,
   };
 }
 

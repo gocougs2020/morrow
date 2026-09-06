@@ -1,4 +1,5 @@
 import { defineDynamic, defineInstructions } from "eve/instructions";
+import { resolveHostSchedulePlan, schedulePlanInstruction } from "../../lib/vercel-plan";
 import { accountEmail, userFromAuth } from "../lib/identity";
 import { settingsForPrincipal } from "../lib/models";
 
@@ -16,9 +17,15 @@ export default defineDynamic({
     "turn.started": async (_event, ctx) => {
       const user = userFromAuth(ctx.session.auth.current);
       const email = user ? await accountEmail(user) : null;
-      if (!email) return null;
+      const plan = await resolveHostSchedulePlan();
+      const parts = [schedulePlanInstruction(plan)];
+      if (email) {
+        parts.push(
+          `Signed-in user email: ${email}. When they ask to email themselves, send to this address. Do not ask them to type it.`,
+        );
+      }
       return defineInstructions({
-        content: `Signed-in user email: ${email}. When they ask to email themselves, send to this address. Do not ask them to type it.`,
+        content: parts.join("\n\n"),
       });
     },
   },

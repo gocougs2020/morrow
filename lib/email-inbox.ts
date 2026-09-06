@@ -1,14 +1,21 @@
 import { classifyEmailAction, emailActionSessionPrompt } from "@/lib/email-classify";
 import { EMAIL_EMBEDDING_KINDS, EMAIL_SEARCH_MIN_SCORE, persistEmailEmbeddings } from "@/lib/email-embeddings";
-import { findUserById, normalizeEmailAddress, parseAddressList, resolveInboxOwner } from "@/lib/email-users";
+import { findUserById, normalizeEmailAddress, parseAddressList } from "@/lib/email-users";
+import {
+  extractInboundMailToken,
+  inboundMailAuthorizesUnattendedSession,
+  isUserAgentInboundRecipient,
+} from "@/lib/inbound-mail-token";
 import { embedTexts } from "@/lib/embeddings";
-import { getResend, isAppInboundRecipient } from "@/lib/resend";
+import { getResend } from "@/lib/resend";
 import {
   createChat,
   createEmail,
   createJob,
+  findUserIdByInboundMailToken,
   getEmail,
   getEmailByResendId,
+  getUserSettings,
   listEmails,
   searchUserEmbeddings,
   titleFromPrompt,
@@ -136,6 +143,7 @@ async function startEmailSessionNow(email: EmailRecord, prompt: string): Promise
   }
 }
 
+/** Start an email-sourced session. Callers must not use inbound From as authorization. */
 export async function startEmailActionSession(email: EmailRecord, prompt: string): Promise<string> {
   const chat = await createChat(
     email.userId,
@@ -167,15 +175,29 @@ export async function processInboundResendEmail(eventData: InboundEmailPayload):
   const ccAddresses = parseAddressList(eventData.cc);
   const receivedFor = parseAddressList(eventData.receivedFor);
   const recipients = [...new Set([...toAddresses, ...ccAddresses, ...receivedFor])];
-  if (!isAppInboundRecipient(recipients)) {
-    console.info("[email] inbound ignored; recipient is not this app", { recipients });
+  if (!isUserAgentInboundRecipient(recipients)) {
+    console.info("[email] inbound ignored; not a user agent address", { recipients });
     return null;
   }
 
   const fromAddress = eventData.from ? normalizeEmailAddress(eventData.from) : "";
-  const owner = await resolveInboxOwner({ fromAddress, toAddresses: recipients });
+  const inboundToken = extractInboundMailToken(recipients);
+  const tokenUserId = inboundToken ? await findUserIdByInboundMailToken(inboundToken) : null;
+  const owner = tokenUserId ? await findUserById(tokenUserId) : null;
   if (!owner) {
     console.info("[email] inbound ignored; no matching user", { fromAddress, recipients });
+    return null;
+  }
+  const settings = await getUserSettings(owner.id);
+  if (
+    !inboundMailAuthorizesUnattendedSession({
+      recipients,
+      fromAddress,
+      ownerToken: settings.inboundMailToken,
+      ownerEmail: owner.email,
+    })
+  ) {
+    console.info("[email] inbound ignored; From is not the address owner", { fromAddress, recipients });
     return null;
   }
 
@@ -216,22 +238,17 @@ export async function processInboundResendEmail(eventData: InboundEmailPayload):
   });
   void persistEmailEmbeddings(email);
 
-  const fromOwner = normalizeEmailAddress(owner.email) === fromAddress;
-  if (!fromOwner) {
-    return email;
-  }
-
   const action = await classifyEmailAction(email);
-  if (!action.hasActionItem) {
-    return email;
-  }
-
   const withAction =
     (await updateEmail(owner.id, email.id, {
       hasActionItem: true,
-      actionSummary: action.summary || action.prompt,
+      actionSummary: action.summary || action.prompt || email.subject || "Email to agent",
     })) ?? email;
-  const prompt = emailActionSessionPrompt(withAction, action);
+  const prompt = emailActionSessionPrompt(withAction, {
+    hasActionItem: true,
+    summary: action.summary || action.prompt || withAction.actionSummary || "",
+    prompt: action.prompt || action.summary || "Complete the request in this email.",
+  });
   await startEmailActionSession(withAction, prompt);
   return (await getEmail(owner.id, email.id)) ?? withAction;
 }

@@ -30,13 +30,15 @@ export type GeneratedSchedule = {
   cadence: JobCadence;
 };
 
-function scheduleSystemPrompt(): string {
+function scheduleSystemPrompt(allowsSubDaily: boolean): string {
   return [
     "You update a user's scheduled job: the this-run brief and the clock cadence.",
     "brief is this-run facts only. Do not include a skill slug, YAML, a procedure, or the line 'Run now. Do not ask questions.'",
     "If the user only changes timing, keep the current brief. If they change the task, revise the brief and keep useful facts.",
     "cadence must be a valid structured schedule. Prefer the simplest kind that matches the request.",
-    "Kinds: once (YYYY-MM-DDTHH:mm wall time), hourly (minute past the hour), daily, weekly (weekdays 0=Sun..6=Sat), monthly (calendar days 1-31), weekdayOfMonth (nth weekday of a month), interval (every N minutes).",
+    allowsSubDaily
+      ? "Kinds: once (YYYY-MM-DDTHH:mm wall time), hourly (minute past the hour), daily, weekly (weekdays 0=Sun..6=Sat), monthly (calendar days 1-31), weekdayOfMonth (nth weekday of a month), interval (every N minutes)."
+      : "This host only allows jobs that fire at most once a day. Kinds: once (YYYY-MM-DDTHH:mm wall time), daily, weekly (weekdays 0=Sun..6=Sat), monthly (calendar days 1-31), weekdayOfMonth (nth weekday of a month). Do not use hourly. If they ask for an interval, use everyMinutes of 1440 or more, or switch to daily.",
     "Examples: every Tuesday → weekly weekdays [2]. First Tuesday of every month → weekdayOfMonth nth 1 weekday 2 intervalMonths 1. First Tuesday of every other month → weekdayOfMonth nth 1 weekday 2 intervalMonths 2. Last Friday every month → weekdayOfMonth nth -1 weekday 5 intervalMonths 1.",
     "nth is 1, 2, 3, 4, or -1 for last. Omit monthMod; the app fills it.",
     "Keep the current IANA timezone unless the user names a different one. Use 24-hour hour 0-23.",
@@ -45,11 +47,13 @@ function scheduleSystemPrompt(): string {
 }
 
 export async function generateScheduleUpdate({
+  allowsSubDaily = false,
   currentCadence,
   currentPrompt,
   prompt,
   timezone,
 }: {
+  allowsSubDaily?: boolean;
   currentCadence: JobCadence;
   currentPrompt: string;
   prompt: string;
@@ -75,7 +79,7 @@ export async function generateScheduleUpdate({
       .filter(Boolean)
       .join("\n\n"),
     reasoning: "none",
-    system: scheduleSystemPrompt(),
+    system: scheduleSystemPrompt(allowsSubDaily),
   });
   void recordGenerateTextUsage("instructions", scheduleModel, result);
   const brief = result.output.brief.trim();

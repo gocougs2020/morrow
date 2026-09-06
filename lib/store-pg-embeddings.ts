@@ -1,6 +1,12 @@
 import { and, cosineDistance, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { getNeonDb } from "@/lib/db";
 import { pgEmbeddings } from "@/lib/db/schema";
+import {
+  embeddingSearchQueries,
+  rankEmbeddingHits,
+  shouldSkipEmbeddingSearch,
+  toIso,
+} from "@/lib/store-logic";
 import type {
   EmbeddingKind,
   EmbeddingSearchHit,
@@ -8,33 +14,18 @@ import type {
   EmbeddingSourceType,
 } from "@/lib/types";
 
-function iso(value: Date | string | null | undefined): string | null {
-  if (value == null) return null;
-  return value instanceof Date ? value.toISOString() : value;
-}
-
 export async function searchUserEmbeddings(
   input: EmbeddingSearchInput,
 ): Promise<EmbeddingSearchHit[]> {
-  const queries = input.queryEmbeddings.filter((query) => query.length > 0);
-  if (queries.length === 0 || input.limit <= 0) return [];
+  if (shouldSkipEmbeddingSearch(input)) return [];
 
   const hits = (
-    await Promise.all(queries.map((query) => searchUserEmbeddingsForQuery(input, query)))
+    await Promise.all(
+      embeddingSearchQueries(input).map((query) => searchUserEmbeddingsForQuery(input, query)),
+    )
   ).flat();
 
-  const byId = new Map<string, EmbeddingSearchHit>();
-  for (const hit of hits) {
-    const existing = byId.get(hit.record.id);
-    if (!existing || hit.score > existing.score) {
-      byId.set(hit.record.id, hit);
-    }
-  }
-
-  return [...byId.values()]
-    .filter((hit) => input.minScore == null || hit.score >= input.minScore)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, input.limit);
+  return rankEmbeddingHits(hits, input);
 }
 
 async function searchUserEmbeddingsForQuery(
@@ -89,8 +80,8 @@ async function searchUserEmbeddingsForQuery(
       turnId: row.turnId,
       text: row.text,
       embedding: [],
-      createdAt: iso(row.createdAt) ?? "",
-      updatedAt: iso(row.updatedAt) ?? "",
+      createdAt: toIso(row.createdAt) ?? "",
+      updatedAt: toIso(row.updatedAt) ?? "",
     },
     score: Number(row.score),
   }));

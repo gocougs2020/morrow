@@ -1,11 +1,25 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { requireEnabledSkillSlug } from "../../lib/available-skills";
-import { jobCadenceSchema, scheduleFieldsFromCadence } from "../../lib/job-cadence";
-import { composeSchedulePrompt, parseSchedulePrompt, SCHEDULE_BRIEF_MAX } from "../../lib/schedule-prompt";
+import {
+  jobCadenceSchema,
+  onceCadenceFromInstant,
+  scheduleFieldsFromCadence,
+} from "../../lib/job-cadence";
+import {
+  composeSchedulePrompt,
+  parseSchedulePrompt,
+  REMIND_SKILL_SLUG,
+  SCHEDULE_BRIEF_MAX,
+} from "../../lib/schedule-prompt";
 import { SKILL_NAME_MAX, SKILL_NAME_PATTERN } from "../../lib/skill-document";
 import { canonicalSkillSlug } from "../../lib/skill-mention";
 import { createJob, listUserSkills } from "../../lib/store";
+import {
+  cadenceFiresMoreThanOncePerDay,
+  resolveHostSchedulePlan,
+  SUB_DAILY_SCHEDULE_MESSAGE,
+} from "../../lib/vercel-plan";
 import { requireUser } from "../lib/identity";
 
 const skillSlugSchema = z
@@ -17,12 +31,12 @@ const skillSlugSchema = z
 
 export default defineTool({
   description:
-    "Create a one-time or repeating scheduled job. Pass a configured skill plus a short this-run brief — never the skill procedure, and never a bare /slug. Omit skill only for a one-off reminder with no reusable procedure.",
+    "Create a one-time or repeating scheduled job. Pass a configured skill plus a short this-run brief — never the skill procedure, and never a bare /slug. For a personal nudge (ping the user), omit skill. For agent follow-through, pass skill remind. Both need cadence once and a date and time — ask if the user did not give one. On Hobby hosts (the default), cadence must be once, daily, weekly, monthly, or weekdayOfMonth — not hourly or an interval under 24 hours.",
   inputSchema: z.object({
     skill: skillSlugSchema
       .optional()
       .describe(
-        "Enabled skill to invoke each fire (weekly-review, meeting-prep, or a custom slug). Omit only for a one-off reminder.",
+        "Enabled skill to invoke each fire (remind, weekly-review, meeting-prep, or a custom slug). Omit for a personal nudge. Pass remind when the agent should do the work at fire time.",
       ),
     brief: z
       .string()
@@ -54,10 +68,21 @@ export default defineTool({
       skill,
       brief: parsed.brief || input.brief,
     });
-    const fields = input.cadence ? scheduleFieldsFromCadence(input.cadence) : null;
+    const fields = input.cadence
+      ? scheduleFieldsFromCadence(input.cadence)
+      : (!skill || skill === REMIND_SKILL_SLUG) && input.everyMinutes == null
+        ? scheduleFieldsFromCadence(onceCadenceFromInstant(input.firstRunAt))
+        : null;
+    const plan = await resolveHostSchedulePlan();
+    if (
+      !plan.allowsSubDaily &&
+      cadenceFiresMoreThanOncePerDay(fields?.cadence ?? input.cadence, fields?.everyMinutes ?? input.everyMinutes)
+    ) {
+      throw new Error(SUB_DAILY_SCHEDULE_MESSAGE);
+    }
     return await createJob(user.userId, {
       prompt,
-      firstRunAt: input.firstRunAt,
+      firstRunAt: input.firstRunAt ?? fields?.nextRunAt,
       everyMinutes: fields?.everyMinutes ?? input.everyMinutes,
       cadence: fields?.cadence ?? null,
       authenticator: user.authenticator ?? "better-auth",

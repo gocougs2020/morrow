@@ -493,8 +493,10 @@ export function SetupChecklist({
             >
               <p>
                 Add <code className="font-mono">RESEND_API_KEY</code> and{" "}
-                <code className="font-mono">RESEND_FROM_EMAIL</code> so the agent can send and
-                receive mail. The README has the inbound webhook steps.
+                <code className="font-mono">RESEND_FROM_EMAIL</code> so signup can send a
+                verification link and the agent can send and receive mail. The README has the
+                inbound webhook steps. Locally, without Resend, the verification URL is printed
+                in the server log.
               </p>
             </SetupStep>
           </ol>

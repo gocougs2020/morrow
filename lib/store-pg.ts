@@ -34,8 +34,40 @@ import type {
   UserSettings,
   UserSkill,
 } from "@/lib/types";
-import { advanceJobAfterRun, parseJobCadence } from "@/lib/job-cadence";
-import { normalizeChatSource } from "@/lib/types";
+import { normalizeInboundMailToken } from "@/lib/inbound-mail-token";
+import { parseJobCadence } from "@/lib/job-cadence";
+import {
+  applyCitationUpdate,
+  applyEmbeddingUpdate,
+  applySettingsPatch,
+  asDate,
+  chatEventId,
+  chatEventRecords,
+  chatPatchFields,
+  completeJobMutation,
+  type CreateEmailInput,
+  type CreateEmbeddingInput,
+  type CreateJobInput,
+  type CreateSkillInput,
+  type EmailPatch,
+  type JobPatch,
+  type UpsertCitationInput,
+  defaultSettings,
+  EMAIL_LIST_DEFAULT_LIMIT,
+  settingsFromStored,
+  jobCadenceUpdate,
+  newChatRecord,
+  newCitationSet,
+  newEmailRecord,
+  newEmbeddingRecord,
+  newJobRecord,
+  newSkillRecord,
+  normalizeChat,
+  normalizeEmail,
+  nowIso,
+  releasedJobFields,
+  toIso,
+} from "@/lib/store-logic";
 import {
   LIBRARY_SHARE_VALUES,
   isVisibleToViewer,
@@ -49,31 +81,18 @@ function nowDate() {
   return new Date();
 }
 
-function iso(value: Date | string | null | undefined): string | null {
-  if (value == null) return null;
-  return value instanceof Date ? value.toISOString() : value;
-}
-
-function asDate(value: string | Date) {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function defaultSettings(userId: string): UserSettings {
-  return { userId, modelTier: "auto", instructionOverlay: "" };
-}
-
 function mapChat(row: typeof pgChats.$inferSelect): ChatRecord {
-  return {
+  return normalizeChat({
     id: row.id,
     userId: row.userId,
     title: row.title,
     description: row.description ?? "",
-    source: normalizeChatSource(row.source),
+    source: row.source as ChatSource,
     sessionId: row.sessionId,
     streamIndex: row.streamIndex,
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
-  };
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
+  });
 }
 
 function mapSkill(row: typeof pgUserSkills.$inferSelect): UserSkill {
@@ -86,8 +105,8 @@ function mapSkill(row: typeof pgUserSkills.$inferSelect): UserSkill {
     markdown: row.markdown,
     enabled: row.enabled,
     visibility: normalizeVisibility(row.visibility),
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
   };
 }
 
@@ -106,8 +125,8 @@ function mapDocument(row: typeof pgDocuments.$inferSelect): DocumentRecord {
     isPublic: row.isPublic || row.visibility === "public",
     shareId: row.shareId,
     visibility: normalizeLibraryVisibility(row.visibility, row.isPublic),
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
   };
 }
 
@@ -119,8 +138,8 @@ function mapFolder(row: typeof pgDocumentFolders.$inferSelect): DocumentFolder {
     name: row.name,
     description: row.description,
     visibility: normalizeLibraryVisibility(row.visibility),
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
   };
 }
 
@@ -129,19 +148,19 @@ function mapJob(row: typeof pgScheduledJobs.$inferSelect): ScheduledJob {
     id: row.id,
     userId: row.userId,
     prompt: row.prompt,
-    firstRunAt: iso(row.firstRunAt) ?? "",
-    nextRunAt: iso(row.nextRunAt) ?? "",
+    firstRunAt: toIso(row.firstRunAt) ?? "",
+    nextRunAt: toIso(row.nextRunAt) ?? "",
     everyMinutes: row.everyMinutes,
     cadence: parseJobCadence(row.cadence),
     enabled: row.enabled,
     leaseToken: row.leaseToken,
-    leaseUntil: iso(row.leaseUntil),
+    leaseUntil: toIso(row.leaseUntil),
     lastError: row.lastError,
     authenticator: row.authenticator,
     issuer: row.issuer,
     visibility: normalizeVisibility(row.visibility),
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
   };
 }
 
@@ -152,34 +171,43 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
     .where(eq(pgUserSettings.userId, userId))
     .limit(1);
   if (!row) return defaultSettings(userId);
-  return {
-    userId: row.userId,
-    modelTier: row.modelTier as UserSettings["modelTier"],
-    instructionOverlay: row.instructionOverlay,
-  };
+  return settingsFromStored(row);
 }
 
 export async function upsertUserSettings(
   userId: string,
-  patch: Partial<Pick<UserSettings, "modelTier" | "instructionOverlay">>,
+  patch: Partial<Pick<UserSettings, "modelTier" | "instructionOverlay" | "inboundMailToken">>,
 ): Promise<UserSettings> {
   const current = await getUserSettings(userId);
-  const next = { ...current, ...patch, userId };
+  const next = applySettingsPatch(current, patch);
   await getNeonDb()
     .insert(pgUserSettings)
     .values({
       userId,
       modelTier: next.modelTier,
       instructionOverlay: next.instructionOverlay,
+      inboundMailToken: next.inboundMailToken,
     })
     .onConflictDoUpdate({
       target: pgUserSettings.userId,
       set: {
         modelTier: next.modelTier,
         instructionOverlay: next.instructionOverlay,
+        inboundMailToken: next.inboundMailToken,
       },
     });
   return next;
+}
+
+export async function findUserIdByInboundMailToken(token: string): Promise<string | null> {
+  const normalized = normalizeInboundMailToken(token);
+  if (!normalized) return null;
+  const [row] = await getNeonDb()
+    .select({ userId: pgUserSettings.userId })
+    .from(pgUserSettings)
+    .where(eq(pgUserSettings.inboundMailToken, normalized))
+    .limit(1);
+  return row?.userId ?? null;
 }
 
 export async function listChats(userId: string): Promise<ChatRecord[]> {
@@ -210,20 +238,13 @@ export async function createChat(
   title: string,
   source: ChatSource = "web",
 ): Promise<ChatRecord> {
-  const stamp = nowDate();
-  const chat = {
-    id: randomUUID(),
-    userId,
-    title,
-    description: "",
-    source,
-    sessionId: null,
-    streamIndex: 0,
-    createdAt: stamp,
-    updatedAt: stamp,
-  };
-  await getNeonDb().insert(pgChats).values(chat);
-  return mapChat(chat);
+  const chat = newChatRecord(userId, title, source);
+  await getNeonDb().insert(pgChats).values({
+    ...chat,
+    createdAt: asDate(chat.createdAt),
+    updatedAt: asDate(chat.updatedAt),
+  });
+  return chat;
 }
 
 export async function updateChat(
@@ -233,12 +254,11 @@ export async function updateChat(
 ): Promise<ChatRecord | null> {
   const current = await getChat(userId, chatId);
   if (!current) return null;
-  const { touchUpdatedAt, ...fields } = patch;
   const [row] = await getNeonDb()
     .update(pgChats)
     .set({
-      ...fields,
-      ...(touchUpdatedAt ? { updatedAt: nowDate() } : {}),
+      ...chatPatchFields(patch),
+      ...(patch.touchUpdatedAt ? { updatedAt: nowDate() } : {}),
     })
     .where(and(eq(pgChats.userId, userId), eq(pgChats.id, chatId)))
     .returning();
@@ -295,7 +315,7 @@ export async function listChatEvents(chatId: string): Promise<ChatEventRecord[]>
 }
 
 export async function upsertChatEvent(chatId: string, index: number, event: unknown) {
-  const id = `${chatId}:${index}`;
+  const id = chatEventId(chatId, index);
   await getNeonDb()
     .insert(pgChatEvents)
     .values({ id, chatId, index, event })
@@ -315,14 +335,7 @@ export async function replaceChatEvents(chatId: string, events: unknown[]) {
   // cannot collide on the deterministic `${chatId}:${index}` primary key.
   await db
     .insert(pgChatEvents)
-    .values(
-      events.map((event, index) => ({
-        id: `${chatId}:${index}`,
-        chatId,
-        index,
-        event,
-      })),
-    )
+    .values(chatEventRecords(chatId, events))
     .onConflictDoUpdate({
       target: pgChatEvents.id,
       set: { event: sql`excluded.event` },
@@ -342,26 +355,15 @@ export async function listUserSkills(userId: string): Promise<UserSkill[]> {
 
 export async function createUserSkill(
   userId: string,
-  input: Pick<UserSkill, "name" | "slug" | "description" | "markdown"> & {
-    enabled?: boolean;
-    visibility?: UserSkill["visibility"];
-  },
+  input: CreateSkillInput,
 ): Promise<UserSkill> {
-  const stamp = nowDate();
-  const skill = {
-    id: randomUUID(),
-    userId,
-    name: input.name,
-    slug: input.slug,
-    description: input.description,
-    markdown: input.markdown,
-    enabled: input.enabled ?? true,
-    visibility: normalizeVisibility(input.visibility, "private"),
-    createdAt: stamp,
-    updatedAt: stamp,
-  };
-  await getNeonDb().insert(pgUserSkills).values(skill);
-  return mapSkill(skill);
+  const skill = newSkillRecord(userId, input);
+  await getNeonDb().insert(pgUserSkills).values({
+    ...skill,
+    createdAt: asDate(skill.createdAt),
+    updatedAt: asDate(skill.updatedAt),
+  });
+  return skill;
 }
 
 export async function updateUserSkill(
@@ -396,54 +398,31 @@ export async function listJobs(userId: string): Promise<ScheduledJob[]> {
 
 export async function createJob(
   userId: string,
-  input: Pick<ScheduledJob, "prompt" | "firstRunAt" | "everyMinutes" | "authenticator" | "issuer"> & {
-    cadence?: ScheduledJob["cadence"];
-    visibility?: ScheduledJob["visibility"];
-  },
+  input: CreateJobInput,
 ): Promise<ScheduledJob> {
-  const stamp = nowDate();
-  const firstRunAt = asDate(input.firstRunAt);
-  const job = {
-    id: randomUUID(),
-    userId,
-    prompt: input.prompt,
-    firstRunAt,
-    nextRunAt: firstRunAt,
-    everyMinutes: input.everyMinutes,
-    cadence: parseJobCadence(input.cadence),
-    enabled: true,
-    leaseToken: null,
-    leaseUntil: null,
-    lastError: null,
-    authenticator: input.authenticator,
-    issuer: input.issuer,
-    visibility: "private",
-    createdAt: stamp,
-    updatedAt: stamp,
-  };
-  await getNeonDb().insert(pgScheduledJobs).values(job);
-  return mapJob(job);
+  const job = newJobRecord(userId, input);
+  await getNeonDb().insert(pgScheduledJobs).values({
+    ...job,
+    firstRunAt: asDate(job.firstRunAt),
+    nextRunAt: asDate(job.nextRunAt),
+    leaseUntil: job.leaseUntil ? asDate(job.leaseUntil) : null,
+    createdAt: asDate(job.createdAt),
+    updatedAt: asDate(job.updatedAt),
+  });
+  return job;
 }
 
 export async function updateJob(
   userId: string,
   jobId: string,
-  patch: Partial<
-    Pick<
-      ScheduledJob,
-      "prompt" | "nextRunAt" | "everyMinutes" | "cadence" | "enabled" | "lastError" | "visibility"
-    >
-  >,
+  patch: JobPatch,
 ): Promise<ScheduledJob | null> {
   const { nextRunAt, ...rest } = patch;
+  const cadence = jobCadenceUpdate(patch);
   const next = {
     ...rest,
     ...(nextRunAt ? { nextRunAt: asDate(nextRunAt) } : {}),
-    ...(patch.cadence !== undefined
-      ? { cadence: parseJobCadence(patch.cadence) }
-      : patch.everyMinutes !== undefined
-        ? { cadence: null }
-        : {}),
+    ...(cadence !== undefined ? { cadence } : {}),
     updatedAt: nowDate(),
   };
   const [row] = await getNeonDb()
@@ -462,21 +441,30 @@ export async function deleteJob(userId: string, jobId: string): Promise<boolean>
   return deleted.length > 0;
 }
 
+function jobUnleased(now: Date) {
+  return or(isNull(pgScheduledJobs.leaseUntil), lte(pgScheduledJobs.leaseUntil, now));
+}
+
+function jobOwnedByLease(job: ScheduledJob) {
+  return and(eq(pgScheduledJobs.id, job.id), eq(pgScheduledJobs.leaseToken, job.leaseToken ?? ""));
+}
+
 export async function claimDueJobs(options: {
   now: Date;
   limit: number;
   leaseForMs: number;
 }): Promise<ScheduledJob[]> {
   const due = await getNeonDb()
-    .select()
+    .select({ id: pgScheduledJobs.id })
     .from(pgScheduledJobs)
     .where(
       and(
         eq(pgScheduledJobs.enabled, true),
         lte(pgScheduledJobs.nextRunAt, options.now),
-        or(isNull(pgScheduledJobs.leaseUntil), lte(pgScheduledJobs.leaseUntil, options.now)),
+        jobUnleased(options.now),
       ),
     )
+    .orderBy(pgScheduledJobs.nextRunAt)
     .limit(options.limit);
 
   const leaseUntil = new Date(options.now.getTime() + options.leaseForMs);
@@ -490,40 +478,82 @@ export async function claimDueJobs(options: {
         leaseUntil,
         updatedAt: nowDate(),
       })
-      .where(eq(pgScheduledJobs.id, job.id))
+      .where(
+        and(
+          eq(pgScheduledJobs.id, job.id),
+          eq(pgScheduledJobs.enabled, true),
+          lte(pgScheduledJobs.nextRunAt, options.now),
+          jobUnleased(options.now),
+        ),
+      )
       .returning();
     if (row) claimed.push(mapJob(row));
   }
   return claimed;
 }
 
-export async function completeJob(job: ScheduledJob) {
-  const current = nowDate();
-  const advanced = advanceJobAfterRun(job);
-  await getNeonDb()
+export async function claimJob(
+  jobId: string,
+  options: { now: Date; leaseForMs: number },
+): Promise<ScheduledJob | null> {
+  const [row] = await getNeonDb()
     .update(pgScheduledJobs)
     .set({
-      enabled: advanced.enabled,
-      ...(advanced.nextRunAt ? { nextRunAt: asDate(advanced.nextRunAt) } : {}),
-      leaseToken: null,
-      leaseUntil: null,
-      lastError: null,
-      updatedAt: current,
-    })
-    .where(eq(pgScheduledJobs.id, job.id));
-}
-
-export async function releaseJob(job: ScheduledJob, error: string, retryAt: Date) {
-  await getNeonDb()
-    .update(pgScheduledJobs)
-    .set({
-      leaseToken: null,
-      leaseUntil: null,
-      lastError: error,
-      nextRunAt: retryAt,
+      leaseToken: randomUUID(),
+      leaseUntil: new Date(options.now.getTime() + options.leaseForMs),
       updatedAt: nowDate(),
     })
-    .where(eq(pgScheduledJobs.id, job.id));
+    .where(
+      and(eq(pgScheduledJobs.id, jobId), eq(pgScheduledJobs.enabled, true), jobUnleased(options.now)),
+    )
+    .returning();
+  return row ? mapJob(row) : null;
+}
+
+export async function completeJob(job: ScheduledJob): Promise<boolean> {
+  if (!job.leaseToken) return false;
+  const mutation = completeJobMutation(job);
+  if (mutation.action === "delete") {
+    const deleted = await getNeonDb()
+      .delete(pgScheduledJobs)
+      .where(jobOwnedByLease(job))
+      .returning({ id: pgScheduledJobs.id });
+    return deleted.length > 0;
+  }
+  const updated = await getNeonDb()
+    .update(pgScheduledJobs)
+    .set({
+      enabled: mutation.enabled,
+      ...(mutation.nextRunAt ? { nextRunAt: asDate(mutation.nextRunAt) } : {}),
+      leaseToken: mutation.leaseToken,
+      leaseUntil: mutation.leaseUntil,
+      lastError: mutation.lastError,
+      updatedAt: nowDate(),
+    })
+    .where(jobOwnedByLease(job))
+    .returning({ id: pgScheduledJobs.id });
+  return updated.length > 0;
+}
+
+export async function releaseJob(
+  job: ScheduledJob,
+  error: string,
+  retryAt?: Date | null,
+): Promise<boolean> {
+  if (!job.leaseToken) return false;
+  const fields = releasedJobFields(error, retryAt?.toISOString() ?? null, nowIso());
+  const updated = await getNeonDb()
+    .update(pgScheduledJobs)
+    .set({
+      leaseToken: fields.leaseToken,
+      leaseUntil: fields.leaseUntil,
+      lastError: fields.lastError,
+      ...(retryAt ? { nextRunAt: retryAt } : {}),
+      updatedAt: asDate(fields.updatedAt),
+    })
+    .where(jobOwnedByLease(job))
+    .returning({ id: pgScheduledJobs.id });
+  return updated.length > 0;
 }
 
 export async function listDocuments(userId: string): Promise<DocumentRecord[]> {
@@ -798,16 +828,12 @@ function mapEmbedding(row: typeof pgEmbeddings.$inferSelect): EmbeddingRecord {
     turnId: row.turnId,
     text: row.text,
     embedding: asEmbedding(row.embedding),
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
   };
 }
 
-export async function upsertEmbedding(
-  input: Omit<EmbeddingRecord, "id" | "createdAt" | "updatedAt"> & {
-    id?: string;
-  },
-): Promise<EmbeddingRecord> {
+export async function upsertEmbedding(input: CreateEmbeddingInput): Promise<EmbeddingRecord> {
   const turnMatch = input.turnId ? eq(pgEmbeddings.turnId, input.turnId) : isNull(pgEmbeddings.turnId);
   const [existing] = await getNeonDb()
     .select()
@@ -823,17 +849,11 @@ export async function upsertEmbedding(
     .limit(1);
   const timestamp = nowDate();
   if (!existing) {
+    const record = newEmbeddingRecord(input, nowIso(timestamp));
     const [row] = await getNeonDb()
       .insert(pgEmbeddings)
       .values({
-        id: input.id ?? randomUUID(),
-        userId: input.userId,
-        kind: input.kind,
-        sourceType: input.sourceType,
-        sourceId: input.sourceId,
-        turnId: input.turnId ?? null,
-        text: input.text,
-        embedding: input.embedding,
+        ...record,
         createdAt: timestamp,
         updatedAt: timestamp,
       })
@@ -841,12 +861,13 @@ export async function upsertEmbedding(
     if (!row) throw new Error("Failed to create embedding.");
     return mapEmbedding(row);
   }
+  const next = applyEmbeddingUpdate(mapEmbedding(existing), input, nowIso(timestamp));
   const [row] = await getNeonDb()
     .update(pgEmbeddings)
     .set({
-      text: input.text,
-      embedding: input.embedding,
-      sourceType: input.sourceType,
+      text: next.text,
+      embedding: next.embedding,
+      sourceType: next.sourceType,
       updatedAt: timestamp,
     })
     .where(eq(pgEmbeddings.id, existing.id))
@@ -895,16 +916,13 @@ function mapSessionCitationSet(
     chatId: row.chatId,
     queryText: row.queryText,
     citations: row.citations,
-    createdAt: iso(row.createdAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
   };
 }
 
-export async function upsertSessionCitationSet(input: {
-  userId: string;
-  chatId: string;
-  queryText: string;
-  citations: SessionCitationSet["citations"];
-}): Promise<SessionCitationSet> {
+export async function upsertSessionCitationSet(
+  input: UpsertCitationInput,
+): Promise<SessionCitationSet> {
   const [existing] = await getNeonDb()
     .select()
     .from(pgSessionCitations)
@@ -918,24 +936,22 @@ export async function upsertSessionCitationSet(input: {
     .limit(1);
 
   if (!existing) {
+    const record = newCitationSet(input);
     const [row] = await getNeonDb()
       .insert(pgSessionCitations)
       .values({
-        id: randomUUID(),
-        userId: input.userId,
-        chatId: input.chatId,
-        queryText: input.queryText,
-        citations: input.citations,
-        createdAt: nowDate(),
+        ...record,
+        createdAt: asDate(record.createdAt),
       })
       .returning();
     if (!row) throw new Error("Failed to save session citations.");
     return mapSessionCitationSet(row);
   }
 
+  const next = applyCitationUpdate(mapSessionCitationSet(existing), input.citations);
   const [row] = await getNeonDb()
     .update(pgSessionCitations)
-    .set({ citations: input.citations })
+    .set({ citations: next.citations })
     .where(eq(pgSessionCitations.id, existing.id))
     .returning();
   if (!row) throw new Error("Failed to update session citations.");
@@ -968,7 +984,7 @@ function mapUsageRecord(row: typeof pgUsageEvents.$inferSelect): UsageRecord {
     cacheReadTokens: row.cacheReadTokens,
     cacheWriteTokens: row.cacheWriteTokens,
     costUsd: row.costUsd,
-    createdAt: iso(row.createdAt) ?? "",
+    createdAt: toIso(row.createdAt) ?? "",
   };
 }
 
@@ -1039,7 +1055,7 @@ function asStringList(value: unknown): string[] {
 }
 
 function mapEmail(row: typeof pgEmails.$inferSelect): EmailRecord {
-  return {
+  return normalizeEmail({
     id: row.id,
     userId: row.userId,
     direction: row.direction as EmailDirection,
@@ -1056,30 +1072,35 @@ function mapEmail(row: typeof pgEmails.$inferSelect): EmailRecord {
     chatId: row.chatId,
     inReplyTo: row.inReplyTo,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
-    createdAt: iso(row.createdAt) ?? "",
-    updatedAt: iso(row.updatedAt) ?? "",
-  };
+    createdAt: toIso(row.createdAt) ?? "",
+    updatedAt: toIso(row.updatedAt) ?? "",
+  });
 }
 
 export async function listEmails(
-  _userId: string,
+  userId: string,
   options?: { direction?: EmailDirection; limit?: number },
 ): Promise<EmailRecord[]> {
-  const limit = options?.limit ?? 200;
+  const limit = options?.limit ?? EMAIL_LIST_DEFAULT_LIMIT;
   const rows = await getNeonDb()
     .select()
     .from(pgEmails)
-    .where(options?.direction ? eq(pgEmails.direction, options.direction) : undefined)
+    .where(
+      and(
+        eq(pgEmails.userId, userId),
+        options?.direction ? eq(pgEmails.direction, options.direction) : undefined,
+      ),
+    )
     .orderBy(desc(pgEmails.createdAt))
     .limit(limit);
   return rows.map(mapEmail);
 }
 
-export async function getEmail(_userId: string, emailId: string): Promise<EmailRecord | null> {
+export async function getEmail(userId: string, emailId: string): Promise<EmailRecord | null> {
   const [row] = await getNeonDb()
     .select()
     .from(pgEmails)
-    .where(eq(pgEmails.id, emailId))
+    .where(and(eq(pgEmails.id, emailId), eq(pgEmails.userId, userId)))
     .limit(1);
   return row ? mapEmail(row) : null;
 }
@@ -1093,54 +1114,25 @@ export async function getEmailByResendId(resendEmailId: string): Promise<EmailRe
   return row ? mapEmail(row) : null;
 }
 
-export async function createEmail(
-  input: Omit<EmailRecord, "id" | "createdAt" | "updatedAt"> & { id?: string },
-): Promise<EmailRecord> {
-  const stamp = nowDate();
-  const email = {
-    id: input.id ?? randomUUID(),
-    userId: input.userId,
-    direction: input.direction,
-    fromAddress: input.fromAddress,
-    toAddresses: input.toAddresses,
-    ccAddresses: input.ccAddresses,
-    subject: input.subject,
-    bodyText: input.bodyText,
-    bodyHtml: input.bodyHtml,
-    resendEmailId: input.resendEmailId,
-    status: input.status,
-    hasActionItem: input.hasActionItem,
-    actionSummary: input.actionSummary,
-    chatId: input.chatId,
-    inReplyTo: input.inReplyTo,
-    attachments: input.attachments,
-    createdAt: stamp,
-    updatedAt: stamp,
-  };
-  await getNeonDb().insert(pgEmails).values(email);
-  return mapEmail(email);
+export async function createEmail(input: CreateEmailInput): Promise<EmailRecord> {
+  const email = newEmailRecord(input);
+  await getNeonDb().insert(pgEmails).values({
+    ...email,
+    createdAt: asDate(email.createdAt),
+    updatedAt: asDate(email.updatedAt),
+  });
+  return email;
 }
 
 export async function updateEmail(
-  _userId: string,
+  userId: string,
   emailId: string,
-  patch: Partial<
-    Pick<
-      EmailRecord,
-      | "status"
-      | "hasActionItem"
-      | "actionSummary"
-      | "chatId"
-      | "resendEmailId"
-      | "bodyText"
-      | "bodyHtml"
-    >
-  >,
+  patch: EmailPatch,
 ): Promise<EmailRecord | null> {
   const [row] = await getNeonDb()
     .update(pgEmails)
     .set({ ...patch, updatedAt: nowDate() })
-    .where(eq(pgEmails.id, emailId))
+    .where(and(eq(pgEmails.id, emailId), eq(pgEmails.userId, userId)))
     .returning();
   return row ? mapEmail(row) : null;
 }

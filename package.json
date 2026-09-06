@@ -1,6 +1,6 @@
 {
   "name": "morrow",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A deployable workspace for eve agents. Don't wait for tomorrow—deploy an AI agent with Morrow",
   "author": "Logan Dziuk",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "#evals/*": "./evals/*"
   },
   "scripts": {
-    "build": "next build",
+    "build": "node scripts/resolve-vercel-plan.mjs && next build",
     "deploy": "eve deploy",
     "dev": "next dev",
     "eval": "eve eval",
@@ -34,7 +34,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:eve": "eve build",
+    "build:eve": "node scripts/resolve-vercel-plan.mjs && eve build",
     "dev:eve": "eve dev",
     "start:eve": "eve start",
     "db:generate": "drizzle-kit generate",

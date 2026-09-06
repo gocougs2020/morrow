@@ -43,9 +43,16 @@ type RelatedHit = EmbeddingSearchHit;
 export async function resolveChatForEveSession(
   userId: string,
   eveSessionId: string,
+  preferredChatId?: string | null,
 ): Promise<ChatRecord | null> {
   const linked = await getChatByEveSessionId(userId, eveSessionId);
   if (linked) return linked;
+  if (preferredChatId) {
+    const preferred = await getChat(userId, preferredChatId);
+    if (preferred) {
+      return (await updateChat(userId, preferred.id, { sessionId: eveSessionId })) ?? preferred;
+    }
+  }
   const orphans = (await listChats(userId)).filter((chat) => !chat.sessionId);
   const orphan = orphans.find((chat) => chat.source === "email") ?? orphans[0];
   if (!orphan) return null;
@@ -174,14 +181,16 @@ export async function captureCompletedTurn({
   response,
   turnId,
   userId,
+  chatId,
 }: {
   eveSessionId: string;
   prompt: string;
   response: string;
   turnId: string;
   userId: string;
+  chatId?: string | null;
 }) {
-  const chat = await resolveChatForEveSession(userId, eveSessionId);
+  const chat = await resolveChatForEveSession(userId, eveSessionId, chatId);
   const sourceId = chat?.id ?? eveSessionId;
   return runWithUsageScope({ userId, chatId: chat?.id }, async () => {
     const [promptEmbedding, responseEmbedding] = await embedTexts([prompt, response]);

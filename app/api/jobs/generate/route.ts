@@ -3,6 +3,11 @@ import { requireApiSession } from "@/lib/api";
 import { generateScheduleUpdate } from "@/lib/generate-schedule";
 import { parseJobCadence } from "@/lib/job-cadence";
 import { RATE_LIMIT_MESSAGE, rateLimit } from "@/lib/rate-limit";
+import {
+  cadenceFiresMoreThanOncePerDay,
+  resolveHostSchedulePlan,
+  SUB_DAILY_SCHEDULE_MESSAGE,
+} from "@/lib/vercel-plan";
 import { runWithUsageScope } from "@/lib/usage-scope";
 
 export async function POST(request: Request) {
@@ -28,14 +33,22 @@ export async function POST(request: Request) {
   }
 
   try {
+    const schedulePlan = await resolveHostSchedulePlan();
     const generated = await runWithUsageScope({ userId: session.user.id }, () =>
       generateScheduleUpdate({
+        allowsSubDaily: schedulePlan.allowsSubDaily,
         currentCadence,
         currentPrompt: typeof body.currentPrompt === "string" ? body.currentPrompt : "",
         prompt,
         timezone: typeof body.timezone === "string" ? body.timezone : undefined,
       }),
     );
+    if (
+      !schedulePlan.allowsSubDaily &&
+      cadenceFiresMoreThanOncePerDay(generated.cadence)
+    ) {
+      return NextResponse.json({ error: SUB_DAILY_SCHEDULE_MESSAGE }, { status: 400 });
+    }
     return NextResponse.json(generated);
   } catch (generateError) {
     console.error("[jobs] generate failed", generateError);

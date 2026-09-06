@@ -49,6 +49,12 @@ export type AppConfig = {
     relatedSessionMinScore: number;
     /** Abort HyDE (hypothetical reply) if it exceeds this; recall continues with the prompt embedding. */
     hydeTimeoutMs: number;
+    /** Cosine floor for nudge-email context. Higher than related-session recall on purpose. */
+    reminderContextMinScore: number;
+    /** Extra floor for body-only hits (session prompt or file content). */
+    reminderContextBodyMinScore: number;
+    /** Max characters of a matched snippet in the nudge email. */
+    reminderContextSnippetChars: number;
   };
   skills: Record<string, AppSkillConfig>;
   setup: {
@@ -95,6 +101,9 @@ export const appConfig = {
     relatedSessionLimit: 8,
     relatedSessionMinScore: 0.55,
     hydeTimeoutMs: 1000,
+    reminderContextMinScore: 0.74,
+    reminderContextBodyMinScore: 0.78,
+    reminderContextSnippetChars: 200,
   },
 
   /**
@@ -180,6 +189,12 @@ export const appConfig = {
       suggest: false,
       title: "Memory",
       emoji: "🧠",
+    },
+    remind: {
+      enabled: true,
+      suggest: true,
+      title: "Remind",
+      emoji: "⏰",
     },
   },
 

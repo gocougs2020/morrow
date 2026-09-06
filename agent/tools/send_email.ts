@@ -1,14 +1,19 @@
 import { defineTool } from "eve/tools";
-import { always } from "eve/tools/approval";
 import { z } from "zod";
-import { requireUser, resolveSendTo } from "../lib/identity";
+import { isSelfSendTarget, requireUser, resolveSendTo } from "../lib/identity";
 import { sendUserEmail } from "../../lib/email-send";
 import { resendConfigured } from "../../lib/resend";
 
 export default defineTool({
   description:
-    "Send an email through Resend. Use after the user asks to send, including weekly reports, files, or replies. Requires approval. Attach library files with documentIds. Omit to (or pass me / my email) to send to the signed-in user's account email — do not ask them to type that address.",
-  approval: always(),
+    "Send an email through Resend from the signed-in user's agent address. Use after the user asks to send, including weekly reports, files, or replies. Requires approval except on an unattended reminder or /remind run to the signed-in user. Attach library files with documentIds. Omit to (or pass me / my email) to send to the signed-in user's account email — do not ask them to type that address. On a reminder run, omit to and include the session link from the dispatch prompt.",
+  approval: ({ session, toolInput }) => {
+    const attrs = session.auth.current?.attributes;
+    const reminder = attrs?.source === "schedule" && attrs?.reminder === "1";
+    const to = typeof toolInput?.to === "string" ? toolInput.to : undefined;
+    if (reminder && isSelfSendTarget(to)) return "not-applicable";
+    return "user-approval";
+  },
   inputSchema: z.object({
     to: z
       .string()
@@ -54,6 +59,7 @@ export default defineTool({
       html: input.html,
       documentIds: input.documentIds,
       inReplyTo: input.replyToEmailId,
+      chatId: user.chatId,
       idempotencyKey: `send-email/${ctx.callId}`,
     });
 

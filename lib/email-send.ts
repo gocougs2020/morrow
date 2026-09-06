@@ -1,8 +1,10 @@
+import { APP_NAME } from "@/lib/brand";
 import { getDocumentBlob } from "@/lib/blob-store";
 import { persistEmailEmbeddings } from "@/lib/email-embeddings";
 import { parseAddressList } from "@/lib/email-users";
-import { getResend, resendConfigured, resendFromAddress } from "@/lib/resend";
-import { createEmail, getDocument, updateEmail } from "@/lib/store";
+import { composeInboundMailAddress } from "@/lib/inbound-mail-token";
+import { getResend, resendConfigured } from "@/lib/resend";
+import { createEmail, ensureInboundMailToken, getDocument, updateEmail } from "@/lib/store";
 import type { EmailAttachmentMeta, EmailRecord } from "@/lib/types";
 
 export type SendEmailInput = {
@@ -14,6 +16,7 @@ export type SendEmailInput = {
   cc?: readonly string[];
   documentIds?: readonly string[];
   inReplyTo?: string | null;
+  chatId?: string | null;
   idempotencyKey: string;
 };
 
@@ -48,10 +51,24 @@ async function documentAttachments(
   return attachments;
 }
 
+export async function userAgentFromAddress(userId: string): Promise<string> {
+  const settings = await ensureInboundMailToken(userId);
+  const address = settings.inboundMailToken
+    ? composeInboundMailAddress(settings.inboundMailToken)
+    : null;
+  if (!address) {
+    throw new Error(
+      "This user's agent address is not ready. Set RESEND_FROM_EMAIL or an inbound allowlist.",
+    );
+  }
+  return `${APP_NAME} <${address}>`;
+}
+
 export async function sendUserEmail(input: SendEmailInput): Promise<EmailRecord> {
   if (!resendConfigured()) {
     throw new Error("Resend is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL.");
   }
+  const from = await userAgentFromAddress(input.userId);
 
   const to = parseAddressList(input.to);
   const cc = parseAddressList(input.cc);
@@ -69,7 +86,7 @@ export async function sendUserEmail(input: SendEmailInput): Promise<EmailRecord>
   const email = await createEmail({
     userId: input.userId,
     direction: "outbound",
-    fromAddress: resendFromAddress(),
+    fromAddress: from,
     toAddresses: to,
     ccAddresses: cc,
     subject: input.subject.trim(),
@@ -79,14 +96,14 @@ export async function sendUserEmail(input: SendEmailInput): Promise<EmailRecord>
     status: "sent",
     hasActionItem: false,
     actionSummary: null,
-    chatId: null,
+    chatId: input.chatId ?? null,
     inReplyTo: input.inReplyTo ?? null,
     attachments: attachmentMeta,
   });
 
   const { data, error } = await getResend().emails.send(
     {
-      from: resendFromAddress(),
+      from,
       to,
       ...(cc.length > 0 ? { cc } : {}),
       subject: email.subject,

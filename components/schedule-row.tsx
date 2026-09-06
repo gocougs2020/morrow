@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { PencilIcon, SparklesIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, PlayIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { InstructionPrompt } from "@/components/instruction-prompt";
 import { VoiceMicButton } from "@/components/voice-mic-button";
 import {
@@ -63,6 +63,7 @@ import {
   schedulePreviewText,
 } from "@/lib/schedule-prompt";
 import type { ScheduledJob } from "@/lib/types";
+import { MIN_HOBBY_INTERVAL_MINUTES } from "@/lib/vercel-plan";
 import { cn } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -78,10 +79,12 @@ const FREQUENCY_OPTIONS: { value: JobCadenceKind; label: string }[] = [
 ];
 
 export function ScheduleRow({
+  allowsSubDaily = false,
   job,
   onJobChange,
   onRefresh,
 }: {
+  readonly allowsSubDaily?: boolean;
   readonly job: ScheduledJob;
   readonly onJobChange: (job: ScheduledJob) => void;
   readonly onRefresh: () => void;
@@ -92,6 +95,7 @@ export function ScheduleRow({
   const [aiPrompt, setAiPrompt] = useState("");
   const [showAi, setShowAi] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string>();
   const savedBrief = useRef(parseSchedulePrompt(job.prompt).brief);
   const savedCadence = useRef(cadenceKey(inferJobCadence(job)));
@@ -127,14 +131,15 @@ export function ScheduleRow({
     if (key === savedCadence.current) return;
     savedCadence.current = key;
     const generation = ++saveGeneration.current;
-    void patchJob(job.id, { cadence: next }).then((updated) => {
-      if (generation !== saveGeneration.current) return;
-      if (!updated) {
-        setError("Unable to update this schedule.");
-        return;
-      }
-      onJobChangeRef.current(updated);
-    });
+    void patchJob(job.id, { cadence: next })
+      .then((updated) => {
+        if (generation !== saveGeneration.current) return;
+        onJobChangeRef.current(updated);
+      })
+      .catch((cause) => {
+        if (generation !== saveGeneration.current) return;
+        setError(cause instanceof Error ? cause.message : "Unable to update this schedule.");
+      });
   };
 
   const generate = async () => {
@@ -210,8 +215,48 @@ export function ScheduleRow({
           >
             <p className="line-clamp-2 font-medium text-sm">{preview}</p>
             <p className="text-muted-foreground text-xs">{formatCadenceSummary(cadence)}</p>
+            {error || job.lastError ? (
+              <p className="text-destructive text-xs">{error || job.lastError}</p>
+            ) : null}
           </button>
           <div className="flex items-center gap-2">
+            <Button
+              aria-label="Run schedule now"
+              disabled={!job.enabled || running}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setRunning(true);
+                setError(undefined);
+                void fetch(`/api/jobs/${job.id}/run`, { method: "POST" })
+                  .then(async (response) => {
+                    const payload = (await response.json().catch(() => ({}))) as {
+                      error?: string;
+                      job?: ScheduledJob;
+                      deleted?: boolean;
+                    };
+                    if (!response.ok) {
+                      throw new Error(payload.error || "Unable to run this schedule.");
+                    }
+                    if (payload.deleted) {
+                      onRefresh();
+                      return;
+                    }
+                    if (!payload.job) {
+                      throw new Error(payload.error || "Unable to run this schedule.");
+                    }
+                    onJobChange(payload.job);
+                    onRefresh();
+                  })
+                  .catch((runError: unknown) => {
+                    setError(runError instanceof Error ? runError.message : "Unable to run this schedule.");
+                  })
+                  .finally(() => setRunning(false));
+              }}
+            >
+              <PlayIcon />
+            </Button>
             <Button
               aria-expanded={open}
               aria-label="Edit schedule"
@@ -291,9 +336,21 @@ export function ScheduleRow({
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-start">
                   <FrequencyField
+                    allowsSubDaily={allowsSubDaily}
                     id={`${job.id}-frequency`}
                     value={cadence.kind}
-                    onChange={(kind) => saveCadence(retargetCadence(cadence, kind))}
+                    onChange={(kind) => {
+                      const next = retargetCadence(cadence, kind);
+                      if (
+                        !allowsSubDaily &&
+                        next.kind === "interval" &&
+                        next.everyMinutes < MIN_HOBBY_INTERVAL_MINUTES
+                      ) {
+                        saveCadence({ ...next, everyMinutes: MIN_HOBBY_INTERVAL_MINUTES });
+                        return;
+                      }
+                      saveCadence(next);
+                    }}
                   />
                   {cadence.kind === "once" ? (
                     <div className="flex flex-wrap items-end gap-2">
@@ -471,7 +528,7 @@ export function ScheduleRow({
                         />
                       </Field>
                       <Select
-                        value={interval.unit}
+                        value={allowsSubDaily ? interval.unit : "days"}
                         onValueChange={(unit) => {
                           if (unit !== "minutes" && unit !== "hours" && unit !== "days") return;
                           saveCadence({
@@ -484,8 +541,12 @@ export function ScheduleRow({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent align="start">
-                          <SelectItem value="minutes">minutes</SelectItem>
-                          <SelectItem value="hours">hours</SelectItem>
+                          {allowsSubDaily ? (
+                            <>
+                              <SelectItem value="minutes">minutes</SelectItem>
+                              <SelectItem value="hours">hours</SelectItem>
+                            </>
+                          ) : null}
                           <SelectItem value="days">days</SelectItem>
                         </SelectContent>
                       </Select>
@@ -508,9 +569,11 @@ export function ScheduleRow({
               aria-label={job.enabled ? "Pause schedule" : "Resume schedule"}
               checked={job.enabled}
               onCheckedChange={(enabled) => {
-                void patchJob(job.id, { enabled }).then((next) => {
-                  if (next) onJobChange(next);
-                });
+                void patchJob(job.id, { enabled })
+                  .then((next) => {
+                    onJobChange(next);
+                  })
+                  .catch(() => undefined);
               }}
             />
             <AlertDialog>
@@ -589,20 +652,27 @@ function SchedulePromptField({
 }
 
 function FrequencyField({
+  allowsSubDaily,
   id,
   onChange,
   value,
 }: {
+  readonly allowsSubDaily: boolean;
   readonly id: string;
   readonly onChange: (kind: JobCadenceKind) => void;
   readonly value: JobCadenceKind;
 }) {
+  const options = FREQUENCY_OPTIONS.filter((option) => {
+    if (allowsSubDaily) return true;
+    if (option.value === "hourly") return value === "hourly";
+    return true;
+  });
   return (
     <Field htmlFor={id} label="Repeats">
       <Select
         value={value}
         onValueChange={(next) => {
-          const kind = FREQUENCY_OPTIONS.find((option) => option.value === next)?.value;
+          const kind = options.find((option) => option.value === next)?.value;
           if (kind) onChange(kind);
         }}
       >
@@ -610,7 +680,7 @@ function FrequencyField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
-          {FREQUENCY_OPTIONS.map((option) => (
+          {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
@@ -735,17 +805,23 @@ async function savePrompt(job: ScheduledJob, brief: string): Promise<ScheduledJo
 async function patchJob(
   id: string,
   patch: { prompt?: string; enabled?: boolean; cadence?: JobCadence },
-): Promise<ScheduledJob | undefined> {
+): Promise<ScheduledJob> {
   try {
     const response = await fetch("/api/jobs", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...patch }),
     });
-    if (!response.ok) return undefined;
-    const payload = (await response.json()) as { job?: ScheduledJob };
+    const payload = (await response.json().catch(() => ({}))) as {
+      job?: ScheduledJob;
+      error?: string;
+    };
+    if (!response.ok || !payload.job) {
+      throw new Error(payload.error?.trim() || "Unable to update this schedule.");
+    }
     return payload.job;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error("Unable to update this schedule.");
   }
 }

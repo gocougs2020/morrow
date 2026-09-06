@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuth } from "@/lib/auth";
+import { VERIFY_EMAIL_CALLBACK_PATH } from "@/lib/auth-email";
 import { authFormErrorMessage, formField } from "@/lib/auth-form";
 import { ensureNeonAuthSchema } from "@/lib/db";
 import { clientKey, RATE_LIMIT_MESSAGE, rateLimit } from "@/lib/rate-limit";
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   await ensureNeonAuthSchema();
   try {
     await getAuth().api.signUpEmail({
-      body: { name, email, password },
+      body: { name, email, password, callbackURL: VERIFY_EMAIL_CALLBACK_PATH },
       headers: await headers(),
     });
   } catch (error) {
@@ -35,5 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(dest, 303);
   }
 
-  return NextResponse.redirect(new URL("/", request.url), 303);
+  const dest = new URL("/sign-up", request.url);
+  dest.searchParams.set("checkEmail", "1");
+  return NextResponse.redirect(dest, 303);
 }

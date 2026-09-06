@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDownIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, ListFilterIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -12,6 +12,7 @@ import {
   type CSSProperties,
   type Ref,
 } from "react";
+import { SessionSourceMeta } from "@/components/session-source-meta";
 import { ThemeAppearanceButton } from "@/components/theme-toggle";
 import { useOptionalSessionWorkspace } from "@/components/session-workspace-context";
 import {
@@ -26,10 +27,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { getAppAccountNavItems, isAppNavActive } from "@/lib/app-nav";
 import { authClient } from "@/lib/auth-client";
 import { APP_NAME } from "@/lib/brand";
+import {
+  filterSessionList,
+  isScheduledChat,
+  readIncludeScheduledSessions,
+  writeIncludeScheduledSessions,
+} from "@/lib/session-list";
 import type { ChatRecord } from "@/lib/types";
 import { cn, formatSessionUpdatedAt } from "@/lib/utils";
 
@@ -50,6 +63,7 @@ export function SessionSidebar({
   const [deleting, setDeleting] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ChatRecord[]>();
+  const [includeScheduled, setIncludeScheduled] = useState(false);
   const searchTimer = useRef<number>(undefined);
   const searchAbort = useRef<AbortController>(undefined);
   const searchSeq = useRef(0);
@@ -79,7 +93,22 @@ export function SessionSidebar({
   const [listGoesBehind, setListGoesBehind] = useState(false);
   const chats = chatsProp ?? fetchedChats ?? [];
   const searchingNow = Boolean(query.trim());
-  const visibleChats = searchingNow ? (searchResults ?? []) : chats;
+  const visibleChats = filterSessionList(searchingNow ? (searchResults ?? []) : chats, {
+    includeScheduled,
+    alwaysIncludeId: activeChatId,
+  });
+  const hasHiddenScheduled =
+    !searchingNow && !includeScheduled && chats.some((chat) => isScheduledChat(chat));
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restore the scheduled-runs filter after hydration
+    setIncludeScheduled(readIncludeScheduledSessions());
+  }, []);
+
+  const onIncludeScheduledChange = (next: boolean) => {
+    setIncludeScheduled(next);
+    writeIncludeScheduledSessions(next);
+  };
   const canDelete = Boolean(onDeleteChat) || chatsProp === undefined;
 
   useEffect(() => {
@@ -187,8 +216,31 @@ export function SessionSidebar({
         </Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center justify-between p-3">
-          <p className="font-medium text-sm">Sessions</p>
+        <div className="flex shrink-0 items-center justify-between gap-2 p-3">
+          <div className="flex min-w-0 items-center gap-0.5">
+            <p className="font-medium text-sm">Sessions</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label="Filter sessions"
+                  className={cn(includeScheduled && "text-foreground")}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <ListFilterIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuCheckboxItem
+                  checked={includeScheduled}
+                  onCheckedChange={(checked) => onIncludeScheduledChange(checked === true)}
+                >
+                  Scheduled runs
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <Button asChild size="sm" variant="outline">
             <Link
               href="/s"
@@ -236,7 +288,11 @@ export function SessionSidebar({
               <p className="px-2 py-6 text-muted-foreground text-sm">Searching…</p>
             ) : visibleChats.length === 0 ? (
               <p className="px-2 py-6 text-muted-foreground text-sm">
-                {searchingNow ? "No sessions match that search." : "No recent sessions."}
+                {searchingNow
+                  ? "No sessions match that search."
+                  : hasHiddenScheduled
+                    ? "No conversations. Scheduled runs are hidden."
+                    : "No recent sessions."}
               </p>
             ) : (
               visibleChats.map((chat) => (
@@ -420,7 +476,7 @@ function SessionChatLink({
           </span>
         ) : null}
         <span className="mt-0.5 flex items-center justify-between gap-2">
-          <SessionUpdatedAt value={chat.updatedAt} />
+          <SessionSourceMeta chat={chat} time={<SessionUpdatedAt value={chat.updatedAt} />} />
           {showDeleteGutter ? <span aria-hidden className="size-6 shrink-0" /> : null}
         </span>
       </span>

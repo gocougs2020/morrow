@@ -111,6 +111,8 @@ const SKILL_SLUG_ALIASES: Readonly<Record<string, string>> = {
   "quote-management": "decide",
   "cold-email": "write",
   copywriting: "write",
+  reminder: "remind",
+  reminders: "remind",
 };
 
 export function canonicalSkillSlug(slug: string): string {

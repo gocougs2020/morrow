@@ -2,6 +2,7 @@ export const SETTINGS_TABS = [
   "instructions",
   "skills",
   "memory",
+  "inbox",
   "schedules",
   "connections",
 ] as const;

@@ -6,6 +6,11 @@ import { composeSchedulePrompt, parseSchedulePrompt, SCHEDULE_BRIEF_MAX } from "
 import { SKILL_NAME_MAX, SKILL_NAME_PATTERN } from "../../lib/skill-document";
 import { canonicalSkillSlug } from "../../lib/skill-mention";
 import { listJobs, listUserSkills, updateJob } from "../../lib/store";
+import {
+  cadenceFiresMoreThanOncePerDay,
+  resolveHostSchedulePlan,
+  SUB_DAILY_SCHEDULE_MESSAGE,
+} from "../../lib/vercel-plan";
 import { requireUser } from "../lib/identity";
 
 const skillSlugSchema = z
@@ -17,13 +22,13 @@ const skillSlugSchema = z
 
 export default defineTool({
   description:
-    "Update, pause, or resume one of this user's scheduled jobs. When changing the task, pass a skill plus a short this-run brief — never the skill procedure, and never a bare /slug.",
+    "Update, pause, or resume one of this user's scheduled jobs. When changing the task, pass a skill plus a short this-run brief — never the skill procedure, and never a bare /slug. On Hobby hosts (the default), cadence must stay once, daily, weekly, monthly, or weekdayOfMonth — not hourly or an interval under 24 hours.",
   inputSchema: z.object({
     id: z.string(),
     skill: z
       .union([skillSlugSchema, z.null()])
       .optional()
-      .describe("Enabled skill to invoke each fire. Null clears the skill (one-off reminder)."),
+      .describe("Enabled skill to invoke each fire. Null clears the skill (nudge reminder). Pass remind for agent follow-through."),
     brief: z
       .string()
       .min(1)
@@ -61,6 +66,15 @@ export default defineTool({
       });
     }
     const fields = cadence ? scheduleFieldsFromCadence(cadence) : null;
+    if (cadence || patch.everyMinutes !== undefined) {
+      const plan = await resolveHostSchedulePlan();
+      if (
+        !plan.allowsSubDaily &&
+        cadenceFiresMoreThanOncePerDay(cadence, fields?.everyMinutes ?? patch.everyMinutes)
+      ) {
+        throw new Error(SUB_DAILY_SCHEDULE_MESSAGE);
+      }
+    }
     const job = await updateJob(user.userId, id, {
       ...patch,
       ...(prompt !== undefined ? { prompt } : {}),

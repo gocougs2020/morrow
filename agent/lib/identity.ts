@@ -26,6 +26,7 @@ export function userFromAuth(auth: SessionAuth | null | undefined) {
     name: typeof auth.attributes?.name === "string" ? auth.attributes.name : null,
     authenticator: auth.authenticator,
     issuer: auth.issuer ?? null,
+    chatId: typeof auth.attributes?.chatId === "string" ? auth.attributes.chatId : null,
   };
 }
 
@@ -51,14 +52,18 @@ export async function accountEmail(user: {
   return row?.email.trim() || null;
 }
 
+export function isSelfSendTarget(to?: string | null): boolean {
+  const trimmed = to?.trim() ?? "";
+  return !trimmed || SELF_RECIPIENTS.has(trimmed.toLowerCase());
+}
+
 /** Omit `to`, or pass "me" / "my email", to send to the signed-in account. */
 export async function resolveSendTo(
   user: { userId: string; email: string | null },
   to: string | undefined,
 ): Promise<string | null> {
-  const trimmed = to?.trim() ?? "";
-  if (!trimmed || SELF_RECIPIENTS.has(trimmed.toLowerCase())) {
+  if (isSelfSendTarget(to)) {
     return accountEmail(user);
   }
-  return trimmed;
+  return to?.trim() || null;
 }

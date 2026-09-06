@@ -50,25 +50,3 @@ export function inboundAllowlist(): { addresses: Set<string>; domains: Set<strin
 
   return { addresses, domains };
 }
-
-/** True when a recipient is this app's mailbox, not another address on the same Resend account. */
-export function isAppInboundRecipient(addresses: readonly string[]): boolean {
-  const { addresses: allowedAddresses, domains: allowedDomains } = inboundAllowlist();
-  if (allowedAddresses.size === 0 && allowedDomains.size === 0) {
-    return false;
-  }
-
-  return addresses.some((raw) => {
-    const email = normalizeEmailAddress(raw);
-    if (!email.includes("@")) return false;
-    if (allowedAddresses.has(email)) return true;
-
-    const at = email.lastIndexOf("@");
-    const local = email.slice(0, at);
-    const domain = email.slice(at + 1);
-    if (allowedDomains.has(domain)) return true;
-
-    const baseLocal = local.split("+")[0] ?? "";
-    return Boolean(baseLocal) && allowedAddresses.has(`${baseLocal}@${domain}`);
-  });
-}

@@ -28,7 +28,7 @@ Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who
 - Inbox for agent mail (send and receive via Resend)
 - Built-in and user-authored skills (eve skills)
 - Slash-command skill invoke (`/slug`)
-- Scheduled jobs (eve schedules)
+- Scheduled jobs (eve schedules; Vercel compiles the dispatcher into a Cron Job, plus Run now in Settings). Hobby (the default, or no `VERCEL_TOKEN`) is at most once a day. Pro or Enterprise plus `VERCEL_TOKEN` unlocks hourly and minute-level jobs after a redeploy. Each run is a session, hidden from Sessions until you include scheduled runs. `/remind` creates a one-off job: a nudge emails you (optional session/file context only if a tight embedding match clears the floor), or a do-job checks prior work then acts, then emails you with a link to that session and deletes the job.
 - Installable PWA (Add to Home Screen)
 - Session file canvas (files beside the chat)
 - Automatic context compaction (eve)
@@ -36,6 +36,7 @@ Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who
 - Related-session citations (embeddings)
 - Custom instruction overlay (per-user, on top of agent instructions)
 - Signup allowlist (env emails and domains)
+- Email verification on signup (Resend; local without Resend logs the link)
 - One-file product config (`app.config.ts`)
 
 **How to hide the home setup screen.** Until you set `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`, the home page is a setup checklist — locally and on the live site. Completing the other steps (secret, Gateway, Neon, Blob) does not dismiss it. Add your email or a company domain, restart `npm run dev` (or redeploy on Vercel), and that home-page checklist is gone. See [Lock who can sign in](#lock-who-can-sign-in). After you sign in, **Settings → Setup** still shows what’s left (voice, Inbox, and any unfinished host settings). To hide or delete that signed-in page, see [Remove the in-app setup page](#remove-the-in-app-setup-page).
@@ -62,7 +63,7 @@ The button copies this repo into your GitHub account and creates a Vercel projec
 
 Accept Neon and **private** Blob when offered. A linked Vercel project can call models with OIDC, so you do not have to paste `AI_GATEWAY_API_KEY` here.
 
-After deploy, open the site URL. If you set `ALLOWED_SIGNUP_EMAILS`, create your account and you are in. If you skipped a store or an env field, finish [Import the repo yourself](#import-the-repo-yourself) and redeploy.
+After deploy, open the site URL. If you set `ALLOWED_SIGNUP_EMAILS`, create your account and confirm the verification email. If you skipped a store or an env field, finish [Import the repo yourself](#import-the-repo-yourself) and redeploy.
 
 You can also deploy from a terminal after `npm install` — see [Deploy to Vercel](#deploy-to-vercel).
 
@@ -155,9 +156,9 @@ Until one of those is set, the checklist stays on `/`, and anyone who finds the 
 - **On this computer:** enter your email on the last checklist item and click **Save and hide this page**. That writes `ALLOWED_SIGNUP_EMAILS` into `.env.local`. Or add the line yourself, stop the app, and run `npm run dev` again.
 - **On Vercel:** skip this if you already entered it in the Deploy button wizard. Otherwise Settings → Environment Variables → add the same name and value, then redeploy.
 
-After that, the setup page is gone. Open the site, create your account, and you are in.
+After that, the setup page is gone. Open the site, create your account, and confirm the verification email. Production sends that link through Resend (`RESEND_API_KEY`). Local `npm run dev` without Resend prints the link in the server log.
 
-Optional later: `OPENAI_API_KEY` for voice input, and the `RESEND_*` keys for Inbox — see [Environment variables](#environment-variables).
+Optional later: `OPENAI_API_KEY` for voice input, and the rest of the `RESEND_*` keys for Inbox — see [Environment variables](#environment-variables).
 
 Signup, sign-in, transcription, and a few generate routes are rate-limited per server instance. That is a burst brake, not a global quota — the allowlist is the real spend control.
 
@@ -182,9 +183,9 @@ Leave `lib/setup-status.ts` and the public checklist on `/` in place. Those stil
 
 - Signed-in web chat at `/`, with sessions under `/s/[chatId]`
 - Files you can edit, attach to a session, and share (uploads up to 15 MB; markdown, CSV, JSON, PDF, PNG, JPEG, WebP, GIF, and HTML)
-- Inbox for mail the agent sends or receives through Resend, with search
-- Built-in skills for work, home, and a couple of creative examples (research, writing, meeting prep, household plans, images, and more)
-- Long-term sticky-note memory (Settings → Memory) and related-session citations
+- Inbox for mail the agent sends or receives through Resend, with search. Settings → Inbox has each user's send/receive plus-address (`agent+k7xqm-2n4pw@…`). Mail to it starts a session only from that user's account email; rotate it there if it leaks.
+- Built-in skills for work, home, and a couple of creative examples (research, writing, meeting prep, household plans, reminders, images, and more)
+- Long-term sticky-note memory (Settings → Memory), related-session citations, and tight-match context on nudge reminder emails
 - Optional Resend send/receive. Add other services in `agent/connections/` if you need them.
 - Custom instructions, sticky-note memory, and user-authored skills in Settings
 - A Usage page with running session, turn, token, and cost totals — including by day
@@ -231,10 +232,12 @@ Each key matches a folder under `agent/skills/<slug>/`.
 Current defaults — a general starter kit (work, home, and a couple of creative examples). All enabled; intake, files, and memory are on but not suggested on the home page:
 
 - `brainstorming`, `write`, `research`, `meeting-prep`, `plan`
-- `image`, `household`, `story`, `decide`, `weekly-review`
+- `image`, `household`, `story`, `decide`, `weekly-review`, `remind`
 - `intake`, `files`, `memory`
 
 These are examples of procedures you can ship with eve, not a vertical product. Hide or replace any of them via `skills.<slug>.suggest` / `.enabled`, or add your own folder under `agent/skills/`.
+
+`/remind` (aliases `/reminder`, `/reminders`) creates a one-off job. A nudge omits `skill` and emails you. A do-job passes `skill: remind`, checks prior work, then emails. Both delete the job after it fires. Nudge emails may attach one prior session and one file when those embeddings clear the reminder floors below.
 
 To turn one off:
 
@@ -281,17 +284,22 @@ setup: {
 
 `true` shows **Settings → Setup**. `false` hides the page and its links without deleting files.
 
-### Related-session memory
+### Related-session memory and reminder context
 
 ```ts
 memory: {
   relatedSessionLimit: 8,
   relatedSessionMinScore: 0.55,
-  hydeTimeoutMs: 500,
+  hydeTimeoutMs: 1000,
+  reminderContextMinScore: 0.74,
+  reminderContextBodyMinScore: 0.78,
+  reminderContextSnippetChars: 200,
 },
 ```
 
 HyDE (a hypothetical reply used only for retrieval) is aborted after `hydeTimeoutMs`. Recall then searches with whatever query embeddings are ready — usually just the prompt — and continues the turn with no related sessions if nothing ranks above `relatedSessionMinScore`.
+
+Nudge reminder emails do **not** use that related-session path. At fire time the app embeds the reminder brief only (no HyDE) and searches session titles/descriptions/prompts plus file titles/content. A hit must clear `reminderContextMinScore`. A body-only hit (prompt text or file content, no title match) must also clear `reminderContextBodyMinScore`. At most one session and one file are attached, each as a title, a short snippet (`reminderContextSnippetChars`), and a link. A thin brief (“remind me tomorrow”) skips retrieval. Nothing matched is the success case when the note is not clearly about this reminder.
 
 On Neon, related-session search uses pgvector HNSW top-K (cosine) instead of loading every stored embedding into the app. Local JSON fallback still scores in process.
 
@@ -338,15 +346,17 @@ ALLOWED_ACCOUNT_USAGE_EMAILS=ada@agency.com
 | `BLOCKED_ACCESS_EMAILS` | Optional | Comma-separated emails that cannot sign up or keep a session |
 | `ALLOWED_ACCOUNT_USAGE_EMAILS` | Optional | Comma-separated emails that can see the Account usage tab |
 | `RATE_LIMIT_DISABLED` | Local only | Set to `1` to skip the in-process limiter during soak tests. Ignored in production. |
+| `VERCEL_TOKEN` | Optional | Personal token so the app can read the Vercel team billing plan. Without it, the host is treated as Hobby: scheduled jobs at most once a day, and the dispatcher compiles to a daily cron. Pro or Enterprise unlocks hourly and minute-level jobs after a redeploy. |
+| `EMAIL_SESSION_SECRET` | Optional | Shared secret for unattended schedule and inbound-email session starts. Falls back to `RESEND_WEBHOOK_SECRET`, then `BETTER_AUTH_SECRET`. |
 | `AI_GATEWAY_API_KEY` | Local | AI Gateway. On Vercel, OIDC from the linked project can replace this. |
 | `OPENAI_API_KEY` | For voice | Transcription via `gpt-transcribe` |
 | `DATABASE_URL` | Production | Neon Postgres. Unset locally → SQLite + `.data/app.json` |
 | `BLOB_READ_WRITE_TOKEN` | Production | Vercel Blob for private files and file memory. Local fallback is `.data/blobs/` |
-| `RESEND_API_KEY` | For Inbox | Send and receive mail. Get a key at [resend.com/api-keys](https://resend.com/api-keys) |
+| `RESEND_API_KEY` | Signup + Inbox | Verification emails on signup, plus agent send/receive. Get a key at [resend.com/api-keys](https://resend.com/api-keys). Required for production signup. Local `npm run dev` without it prints the verification URL in the server log. |
 | `RESEND_WEBHOOK_SECRET` | For inbound | Signing secret from Resend → Webhooks (`email.received`) |
-| `RESEND_FROM_EMAIL` | For send | Verified `From` address, e.g. `Morrow <agent@yourdomain.com>`. Inbound mail must be addressed here (or the inbound allowlist) or it is ignored. |
-| `RESEND_INBOUND_ADDRESSES` | Optional | Extra inbound addresses, comma-separated. Use when receive is not the From address. |
-| `RESEND_INBOUND_DOMAINS` | Optional | Extra inbound domains, comma-separated. Any local-part on those domains is accepted. |
+| `RESEND_FROM_EMAIL` | Signup + mailbox | Verified workspace `From` for signup and other notices, e.g. `Morrow <agent@yourdomain.com>`. Each user's send/receive address is a plus-tag on this mailbox (or the inbound allowlist). |
+| `RESEND_INBOUND_ADDRESSES` | Optional | Extra mailboxes that can host user plus-addresses, comma-separated. |
+| `RESEND_INBOUND_DOMAINS` | Optional | Extra inbound domains, comma-separated. A plus-tagged user address on those domains is accepted. |
 | `MSB_HOME` | Recommended | Keep `.eve/msb-home` so this project’s microsandbox state stays isolated |
 
 ## Deploy to Vercel
@@ -364,9 +374,9 @@ npx eve link --non-interactive --project your-project-name
 npx eve deploy --non-interactive --yes
 ```
 
-Set `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (your production URL — each clone or fork must set its own), and `DATABASE_URL` on the project before the first production login. Production auth trusts that origin plus localhost; it does not allow every `*.vercel.app` host. Preview deployments still accept the Vercel wildcard. Add Blob (`BLOB_READ_WRITE_TOKEN`) so files and sticky-note memory persist across deploys. Set `ALLOWED_SIGNUP_EMAILS` and/or `ALLOWED_SIGNUP_DOMAINS` on the project (not in `app.config.ts`) so the setup checklist leaves the home page and only those people can sign up or stay signed in. Optionally add `BLOCKED_ACCESS_EMAILS`. To show the Account usage tab to specific people, set `ALLOWED_ACCOUNT_USAGE_EMAILS`.
+Set `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (your production URL — each clone or fork must set its own), `DATABASE_URL`, and `RESEND_API_KEY` on the project before the first production signup. Verification emails will not send without Resend. `npm run dev` does not fire eve schedules on their cron; use **Settings → Schedules → Run now**. A production deploy turns `agent/schedules/dispatcher.ts` into a Vercel Cron Job — confirm it under **Settings → Cron Jobs**. The host is treated as Hobby unless you set `VERCEL_TOKEN` and the billing API reports Pro or Enterprise: then a redeploy compiles a per-minute dispatcher and Settings / the agent allow hourly jobs. Hobby stays daily. `BETTER_AUTH_URL` must be the public origin so the dispatcher can start sessions. If Deployment Protection is on, enable the project’s automation bypass secret so that self-call can get through. Production auth trusts that origin plus localhost; it does not allow every `*.vercel.app` host. Preview deployments still accept the Vercel wildcard. Add Blob (`BLOB_READ_WRITE_TOKEN`) so files and sticky-note memory persist across deploys. Set `ALLOWED_SIGNUP_EMAILS` and/or `ALLOWED_SIGNUP_DOMAINS` on the project (not in `app.config.ts`) so the setup checklist leaves the home page and only those people can sign up or stay signed in. Optionally add `BLOCKED_ACCESS_EMAILS`. To show the Account usage tab to specific people, set `ALLOWED_ACCOUNT_USAGE_EMAILS`.
 
-To let the agent email reports or receive mail, add `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, enable receiving on a Resend domain, and point a webhook at `https://your-app.vercel.app/api/webhooks/resend` for `email.received`. Store the signing secret as `RESEND_WEBHOOK_SECRET`. Events for other addresses on the same Resend account are ignored unless they match `RESEND_FROM_EMAIL`, `RESEND_INBOUND_ADDRESSES`, or `RESEND_INBOUND_DOMAINS`. Inbound mail from the signed-in user's address is classified; action items open an email-sourced session.
+Signup verification uses the same `RESEND_API_KEY` (and `RESEND_FROM_EMAIL` when set). Workspace notices such as that verification mail come from `RESEND_FROM_EMAIL`. User send and receive use each person's plus-address (Settings → Inbox), not the shared mailbox. Enable receiving on a Resend domain and point a webhook at `https://your-app.vercel.app/api/webhooks/resend` for `email.received`. Store the signing secret as `RESEND_WEBHOOK_SECRET`. Events for other addresses on the same Resend account are ignored unless they match `RESEND_FROM_EMAIL`, `RESEND_INBOUND_ADDRESSES`, or `RESEND_INBOUND_DOMAINS`. Mail to a user's plus-address is stored and starts a session only when From is that user's account email. A matching From alone is not enough (From is spoofable). Treat the plus-address like a password and rotate it if it leaks. Scheduled one-off reminders send to the signed-in user's account email from their agent address and include a link to the reminder session. A nudge may attach at most one prior session and one file, and only when those embeddings clear the reminder floors in `app.config.ts` (`memory.reminderContextMinScore` / `reminderContextBodyMinScore`).
 
 Pushing to a Git-connected Vercel project also deploys. Changing `app.config.ts` requires a new deploy — it is compiled into the app, not read at request time from the host disk.
 
@@ -378,13 +388,15 @@ HTML responses send a Content-Security-Policy plus `X-Content-Type-Options`, `Re
 | --- | --- |
 | Who can sign up or stay signed in (also hides the setup screen) | `.env.local` / Vercel env (`ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`; optional `BLOCKED_ACCESS_EMAILS`) |
 | Who can see Account usage | `.env.local` / Vercel env (`ALLOWED_ACCOUNT_USAGE_EMAILS`) |
+| Hourly or minute-level scheduled jobs | Vercel env `VERCEL_TOKEN` on a Pro or Enterprise team, then redeploy. Without it, jobs stay at most once a day. |
 | Hide the signed-in setup page | `app.config.ts` (`setup.inAppPage`) |
 | Identity, tone, and default workflows | `agent/instructions.md` |
 | Per-user overlay (working style) | Settings → Instructions, or the Settings prompt |
+| Your send/receive address (session starts only from your account email) | Settings → Inbox (rotate there) |
 | Built-in skill steps | `agent/skills/<slug>/SKILL.md` |
 | Tools, connections, schedules | `agent/tools/`, `agent/connections/`, `agent/schedules/` |
 | Intake briefs, quotes, plans, decisions | Files (`create_document`) or sticky-note memory — not dedicated Neon tables |
-| Custom domain tables (your fork) | `lib/db/schema.ts`, `lib/store-pg.ts` / `lib/store-json.ts`, and a tool under `agent/tools/` |
+| Custom domain tables (your fork) | `lib/db/schema.ts`, shared rules in `lib/store-logic.ts`, helpers in `lib/store-pg.ts` / `lib/store-json.ts`, and a tool under `agent/tools/` |
 | Industry-specific behavior | Custom skills + the instruction overlay — not a second hardcoded identity |
 
 After a content-only instructions or skill change, restart `npm run dev` (or redeploy) so eve reloads the agent.

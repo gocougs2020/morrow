@@ -23,11 +23,49 @@ import type {
   UserSettings,
   UserSkill,
 } from "@/lib/types";
-import { cosineSimilarity } from "@/lib/embeddings";
-import { advanceJobAfterRun, parseJobCadence } from "@/lib/job-cadence";
-import { titleForSkillOnlyPrompt } from "@/lib/skill-mention";
-import { normalizeChatSource } from "@/lib/types";
+import { normalizeInboundMailToken } from "@/lib/inbound-mail-token";
+import { parseJobCadence } from "@/lib/job-cadence";
+import {
+  applyChatPatch,
+  applyCitationUpdate,
+  applyEmbeddingUpdate,
+  applySettingsPatch,
+  applyEmailPatch,
+  applyJobLease,
+  applyJobPatch,
+  chatEventRecord,
+  chatEventRecords,
+  completeJobMutation,
+  type CreateEmailInput,
+  type CreateEmbeddingInput,
+  type CreateJobInput,
+  type CreateSkillInput,
+  type EmailPatch,
+  type JobPatch,
+  type UpsertCitationInput,
+  defaultSettings,
+  EMAIL_LIST_DEFAULT_LIMIT,
+  settingsFromStored,
+  holdsJobLease,
+  isJobClaimable,
+  isManualJobClaimable,
+  mergedUsageRecord,
+  newChatRecord,
+  newCitationSet,
+  newEmailRecord,
+  newEmbeddingRecord,
+  newJobRecord,
+  newSkillRecord,
+  normalizeChat,
+  normalizeEmail,
+  releasedJobFields,
+  sameCitationKey,
+  sameEmbeddingKey,
+  scoreEmbeddingRecords,
+} from "@/lib/store-logic";
 import { isVisibleToViewer, normalizeLibraryVisibility, normalizeVisibility } from "@/lib/visibility";
+
+export { titleFromPrompt } from "@/lib/store-logic";
 
 type AppData = {
   chats: ChatRecord[];
@@ -67,10 +105,7 @@ function load(): AppData {
     return {
       ...empty,
       ...parsed,
-      chats: (parsed.chats ?? []).map((chat) => ({
-        ...chat,
-        description: chat.description ?? "",
-      })),
+      chats: (parsed.chats ?? []).map(normalizeChat),
       documents: (parsed.documents ?? []).map((document) => {
         const visibility = normalizeLibraryVisibility(document.visibility, document.isPublic);
         return {
@@ -114,33 +149,29 @@ function now() {
   return new Date().toISOString();
 }
 
-function defaultSettings(userId: string): UserSettings {
-  return { userId, modelTier: "auto", instructionOverlay: "" };
-}
-
 export function getUserSettings(userId: string): UserSettings {
   const data = load();
-  return data.settings.find((row) => row.userId === userId) ?? defaultSettings(userId);
+  const row = data.settings.find((item) => item.userId === userId);
+  return row ? settingsFromStored(row) : defaultSettings(userId);
 }
 
 export function upsertUserSettings(
   userId: string,
-  patch: Partial<Pick<UserSettings, "modelTier" | "instructionOverlay">>,
+  patch: Partial<Pick<UserSettings, "modelTier" | "instructionOverlay" | "inboundMailToken">>,
 ): UserSettings {
   const data = load();
   const current = data.settings.find((row) => row.userId === userId) ?? defaultSettings(userId);
-  const next = { ...current, ...patch, userId };
+  const next = applySettingsPatch(current, patch);
   data.settings = [...data.settings.filter((row) => row.userId !== userId), next];
   save(data);
   return next;
 }
 
-function normalizeChat(chat: ChatRecord): ChatRecord {
-  return {
-    ...chat,
-    description: chat.description ?? "",
-    source: normalizeChatSource(chat.source),
-  };
+export function findUserIdByInboundMailToken(token: string): string | null {
+  const normalized = normalizeInboundMailToken(token);
+  if (!normalized) return null;
+  const row = load().settings.find((item) => item.inboundMailToken === normalized);
+  return row?.userId ?? null;
 }
 
 export function listChats(userId: string): ChatRecord[] {
@@ -167,17 +198,7 @@ export function createChat(
   source: ChatSource = "web",
 ): ChatRecord {
   const data = load();
-  const chat: ChatRecord = {
-    id: randomUUID(),
-    userId,
-    title,
-    description: "",
-    source,
-    sessionId: null,
-    streamIndex: 0,
-    createdAt: now(),
-    updatedAt: now(),
-  };
+  const chat = newChatRecord(userId, title, source);
   data.chats.unshift(chat);
   save(data);
   return chat;
@@ -191,14 +212,9 @@ export function updateChat(
   const data = load();
   const index = data.chats.findIndex((chat) => chat.userId === userId && chat.id === chatId);
   if (index === -1) return null;
-  const { touchUpdatedAt, ...fields } = patch;
-  data.chats[index] = {
-    ...data.chats[index],
-    ...fields,
-    updatedAt: touchUpdatedAt ? now() : data.chats[index].updatedAt,
-  };
+  data.chats[index] = applyChatPatch(data.chats[index], patch);
   save(data);
-  return normalizeChat(data.chats[index]);
+  return data.chats[index];
 }
 
 export function deleteChat(userId: string, chatId: string): boolean {
@@ -236,7 +252,7 @@ export function listChatEvents(chatId: string): ChatEventRecord[] {
 export function upsertChatEvent(chatId: string, index: number, event: unknown) {
   const data = load();
   const existing = data.chatEvents.findIndex((row) => row.chatId === chatId && row.index === index);
-  const record: ChatEventRecord = { id: `${chatId}:${index}`, chatId, index, event };
+  const record = chatEventRecord(chatId, index, event);
   if (existing === -1) data.chatEvents.push(record);
   else data.chatEvents[existing] = record;
   save(data);
@@ -244,10 +260,10 @@ export function upsertChatEvent(chatId: string, index: number, event: unknown) {
 
 export function replaceChatEvents(chatId: string, events: unknown[]) {
   const data = load();
-  data.chatEvents = data.chatEvents.filter((event) => event.chatId !== chatId);
-  events.forEach((event, index) => {
-    data.chatEvents.push({ id: `${chatId}:${index}`, chatId, index, event });
-  });
+  data.chatEvents = [
+    ...data.chatEvents.filter((event) => event.chatId !== chatId),
+    ...chatEventRecords(chatId, events),
+  ];
   save(data);
 }
 
@@ -255,26 +271,9 @@ export function listUserSkills(userId: string): UserSkill[] {
   return load().skills.filter((skill) => skill.userId === userId);
 }
 
-export function createUserSkill(
-  userId: string,
-  input: Pick<UserSkill, "name" | "slug" | "description" | "markdown"> & {
-    enabled?: boolean;
-    visibility?: UserSkill["visibility"];
-  },
-): UserSkill {
+export function createUserSkill(userId: string, input: CreateSkillInput): UserSkill {
   const data = load();
-  const skill: UserSkill = {
-    id: randomUUID(),
-    userId,
-    name: input.name,
-    slug: input.slug,
-    description: input.description,
-    markdown: input.markdown,
-    enabled: input.enabled ?? true,
-    visibility: normalizeVisibility(input.visibility, "private"),
-    createdAt: now(),
-    updatedAt: now(),
-  };
+  const skill = newSkillRecord(userId, input);
   data.skills.push(skill);
   save(data);
   return skill;
@@ -307,60 +306,19 @@ export function listJobs(userId: string): ScheduledJob[] {
     .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt));
 }
 
-export function createJob(
-  userId: string,
-  input: Pick<ScheduledJob, "prompt" | "firstRunAt" | "everyMinutes" | "authenticator" | "issuer"> & {
-    cadence?: ScheduledJob["cadence"];
-    visibility?: ScheduledJob["visibility"];
-  },
-): ScheduledJob {
+export function createJob(userId: string, input: CreateJobInput): ScheduledJob {
   const data = load();
-  const job: ScheduledJob = {
-    id: randomUUID(),
-    userId,
-    prompt: input.prompt,
-    firstRunAt: input.firstRunAt,
-    nextRunAt: input.firstRunAt,
-    everyMinutes: input.everyMinutes,
-    cadence: parseJobCadence(input.cadence),
-    visibility: "private",
-    enabled: true,
-    leaseToken: null,
-    leaseUntil: null,
-    lastError: null,
-    authenticator: input.authenticator,
-    issuer: input.issuer,
-    createdAt: now(),
-    updatedAt: now(),
-  };
+  const job = newJobRecord(userId, input);
   data.jobs.push(job);
   save(data);
   return job;
 }
 
-export function updateJob(
-  userId: string,
-  jobId: string,
-  patch: Partial<
-    Pick<
-      ScheduledJob,
-      "prompt" | "nextRunAt" | "everyMinutes" | "cadence" | "enabled" | "lastError" | "visibility"
-    >
-  >,
-): ScheduledJob | null {
+export function updateJob(userId: string, jobId: string, patch: JobPatch): ScheduledJob | null {
   const data = load();
   const index = data.jobs.findIndex((job) => job.userId === userId && job.id === jobId);
   if (index === -1) return null;
-  const cadence =
-    patch.cadence !== undefined
-      ? parseJobCadence(patch.cadence)
-      : patch.everyMinutes !== undefined
-        ? null
-        : data.jobs[index].cadence;
-  const defined = Object.fromEntries(
-    Object.entries(patch).filter(([, value]) => value !== undefined),
-  );
-  data.jobs[index] = { ...data.jobs[index], ...defined, cadence, updatedAt: now() };
+  data.jobs[index] = applyJobPatch(data.jobs[index], patch);
   save(data);
   return data.jobs[index];
 }
@@ -383,49 +341,68 @@ export function claimDueJobs(options: {
   const leaseUntil = new Date(options.now.getTime() + options.leaseForMs).toISOString();
   const claimed: ScheduledJob[] = [];
 
-  for (const job of data.jobs) {
+  for (let index = 0; index < data.jobs.length; index += 1) {
     if (claimed.length >= options.limit) break;
-    if (!job.enabled) continue;
-    if (job.nextRunAt > current) continue;
-    if (job.leaseUntil && job.leaseUntil > current) continue;
-    job.leaseToken = randomUUID();
-    job.leaseUntil = leaseUntil;
-    job.updatedAt = now();
-    claimed.push(job);
+    const job = data.jobs[index];
+    if (!isJobClaimable(job, current)) continue;
+    data.jobs[index] = applyJobLease(job, randomUUID(), leaseUntil);
+    claimed.push(data.jobs[index]);
   }
 
   save(data);
   return claimed;
 }
 
-export function completeJob(job: ScheduledJob) {
+export function claimJob(
+  jobId: string,
+  options: { now: Date; leaseForMs: number },
+): ScheduledJob | null {
   const data = load();
-  const index = data.jobs.findIndex((row) => row.id === job.id);
-  if (index === -1) return;
-  const current = data.jobs[index];
-  const advanced = advanceJobAfterRun(current);
-  current.enabled = advanced.enabled;
-  if (advanced.nextRunAt) current.nextRunAt = advanced.nextRunAt;
-  current.leaseToken = null;
-  current.leaseUntil = null;
-  current.lastError = null;
-  current.updatedAt = now();
+  const current = options.now.toISOString();
+  const index = data.jobs.findIndex((row) => row.id === jobId);
+  if (index === -1 || !isManualJobClaimable(data.jobs[index], current)) return null;
+  data.jobs[index] = applyJobLease(
+    data.jobs[index],
+    randomUUID(),
+    new Date(options.now.getTime() + options.leaseForMs).toISOString(),
+  );
   save(data);
+  return data.jobs[index];
 }
 
-export function releaseJob(job: ScheduledJob, error: string, retryAt: Date) {
+export function completeJob(job: ScheduledJob): boolean {
   const data = load();
   const index = data.jobs.findIndex((row) => row.id === job.id);
-  if (index === -1) return;
+  if (index === -1 || !holdsJobLease(data.jobs[index], job)) return false;
+  const mutation = completeJobMutation(data.jobs[index]);
+  if (mutation.action === "delete") {
+    data.jobs.splice(index, 1);
+    save(data);
+    return true;
+  }
   data.jobs[index] = {
     ...data.jobs[index],
-    leaseToken: null,
-    leaseUntil: null,
-    lastError: error,
-    nextRunAt: retryAt.toISOString(),
+    enabled: mutation.enabled,
+    nextRunAt: mutation.nextRunAt ?? data.jobs[index].nextRunAt,
+    leaseToken: mutation.leaseToken,
+    leaseUntil: mutation.leaseUntil,
+    lastError: mutation.lastError,
     updatedAt: now(),
   };
   save(data);
+  return true;
+}
+
+export function releaseJob(job: ScheduledJob, error: string, retryAt?: Date | null): boolean {
+  const data = load();
+  const index = data.jobs.findIndex((row) => row.id === job.id);
+  if (index === -1 || !holdsJobLease(data.jobs[index], job)) return false;
+  data.jobs[index] = {
+    ...data.jobs[index],
+    ...releasedJobFields(error, retryAt?.toISOString() ?? null),
+  };
+  save(data);
+  return true;
 }
 
 export function listDocuments(userId: string): DocumentRecord[] {
@@ -601,57 +578,17 @@ export function detachDocument(
   return data.documentSessions.length < before;
 }
 
-export function titleFromPrompt(prompt: string): string {
-  const trimmed = prompt.trim().replace(/\s+/g, " ");
-  const skillTitle = titleForSkillOnlyPrompt(trimmed);
-  if (skillTitle) return skillTitle;
-  return trimmed.length > 56 ? `${trimmed.slice(0, 53)}…` : trimmed || "New session";
-}
-
-function sameEmbeddingKey(
-  row: EmbeddingRecord,
-  input: Pick<EmbeddingRecord, "userId" | "kind" | "sourceId" | "turnId">,
-) {
-  return (
-    row.userId === input.userId &&
-    row.kind === input.kind &&
-    row.sourceId === input.sourceId &&
-    (row.turnId ?? null) === (input.turnId ?? null)
-  );
-}
-
-export function upsertEmbedding(
-  input: Omit<EmbeddingRecord, "id" | "createdAt" | "updatedAt"> & {
-    id?: string;
-  },
-): EmbeddingRecord {
+export function upsertEmbedding(input: CreateEmbeddingInput): EmbeddingRecord {
   const data = load();
   const index = data.embeddings.findIndex((row) => sameEmbeddingKey(row, input));
   const timestamp = now();
   if (index === -1) {
-    const record: EmbeddingRecord = {
-      id: input.id ?? randomUUID(),
-      userId: input.userId,
-      kind: input.kind,
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      turnId: input.turnId ?? null,
-      text: input.text,
-      embedding: input.embedding,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
+    const record = newEmbeddingRecord(input, timestamp);
     data.embeddings.push(record);
     save(data);
     return record;
   }
-  data.embeddings[index] = {
-    ...data.embeddings[index],
-    text: input.text,
-    embedding: input.embedding,
-    sourceType: input.sourceType,
-    updatedAt: timestamp,
-  };
+  data.embeddings[index] = applyEmbeddingUpdate(data.embeddings[index], input, timestamp);
   save(data);
   return data.embeddings[index];
 }
@@ -666,24 +603,7 @@ export function listUserEmbeddings(
 }
 
 export function searchUserEmbeddings(input: EmbeddingSearchInput): EmbeddingSearchHit[] {
-  const queries = input.queryEmbeddings.filter((query) => query.length > 0);
-  if (queries.length === 0 || input.limit <= 0) return [];
-
-  const records = load().embeddings.filter((row) => {
-    if (input.kinds && !input.kinds.includes(row.kind)) return false;
-    if (input.scope === "account") return true;
-    if (row.userId === input.userId) return true;
-    return Boolean(input.includeSourceIds?.includes(row.sourceId));
-  });
-  return records
-    .filter((record) => !input.excludeSourceIds?.includes(record.sourceId))
-    .map((record) => ({
-      record,
-      score: Math.max(...queries.map((query) => cosineSimilarity(query, record.embedding))),
-    }))
-    .filter((hit) => input.minScore == null || hit.score >= input.minScore)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, input.limit);
+  return scoreEmbeddingRecords(load().embeddings, input);
 }
 
 export function deleteEmbeddingsForSource(
@@ -699,37 +619,17 @@ export function deleteEmbeddingsForSource(
   save(data);
 }
 
-export function upsertSessionCitationSet(input: {
-  userId: string;
-  chatId: string;
-  queryText: string;
-  citations: SessionCitationSet["citations"];
-}): SessionCitationSet {
+export function upsertSessionCitationSet(input: UpsertCitationInput): SessionCitationSet {
   const data = load();
-  const index = data.sessionCitations.findIndex(
-    (row) =>
-      row.userId === input.userId &&
-      row.chatId === input.chatId &&
-      row.queryText === input.queryText,
-  );
+  const index = data.sessionCitations.findIndex((row) => sameCitationKey(row, input));
   const timestamp = now();
   if (index === -1) {
-    const record: SessionCitationSet = {
-      id: randomUUID(),
-      userId: input.userId,
-      chatId: input.chatId,
-      queryText: input.queryText,
-      citations: input.citations,
-      createdAt: timestamp,
-    };
+    const record = newCitationSet(input, timestamp);
     data.sessionCitations.push(record);
     save(data);
     return record;
   }
-  data.sessionCitations[index] = {
-    ...data.sessionCitations[index],
-    citations: input.citations,
-  };
+  data.sessionCitations[index] = applyCitationUpdate(data.sessionCitations[index], input.citations);
   save(data);
   return data.sessionCitations[index];
 }
@@ -746,16 +646,11 @@ export function listSessionCitationSets(
 export function upsertUsageRecord(record: UsageRecord): UsageRecord {
   const data = load();
   const index = data.usageEvents.findIndex((row) => row.id === record.id);
-  if (index === -1) {
-    data.usageEvents.push(record);
-  } else {
-    data.usageEvents[index] = {
-      ...record,
-      createdAt: data.usageEvents[index].createdAt,
-    };
-  }
+  const next = mergedUsageRecord(index === -1 ? undefined : data.usageEvents[index], record);
+  if (index === -1) data.usageEvents.push(next);
+  else data.usageEvents[index] = next;
   save(data);
-  return index === -1 ? record : data.usageEvents[index];
+  return next;
 }
 
 export function listUserUsage(userId: string): UsageRecord[] {
@@ -776,31 +671,22 @@ export function listChatUsage(userId: string, chatId: string): UsageRecord[] {
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-function normalizeEmail(email: EmailRecord): EmailRecord {
-  return {
-    ...email,
-    toAddresses: email.toAddresses ?? [],
-    ccAddresses: email.ccAddresses ?? [],
-    attachments: email.attachments ?? [],
-    bodyText: email.bodyText ?? "",
-    bodyHtml: email.bodyHtml ?? "",
-  };
-}
-
 export function listEmails(
   userId: string,
   options?: { direction?: EmailDirection; limit?: number },
 ): EmailRecord[] {
-  const limit = options?.limit ?? 200;
+  const limit = options?.limit ?? EMAIL_LIST_DEFAULT_LIMIT;
   return load()
-    .emails.filter((row) => !options?.direction || row.direction === options.direction)
+    .emails.filter(
+      (row) => row.userId === userId && (!options?.direction || row.direction === options.direction),
+    )
     .map(normalizeEmail)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .slice(0, limit);
 }
 
-export function getEmail(_userId: string, emailId: string): EmailRecord | null {
-  const email = load().emails.find((row) => row.id === emailId);
+export function getEmail(userId: string, emailId: string): EmailRecord | null {
+  const email = load().emails.find((row) => row.userId === userId && row.id === emailId);
   return email ? normalizeEmail(email) : null;
 }
 
@@ -809,47 +695,21 @@ export function getEmailByResendId(resendEmailId: string): EmailRecord | null {
   return email ? normalizeEmail(email) : null;
 }
 
-export function createEmail(
-  input: Omit<EmailRecord, "id" | "createdAt" | "updatedAt"> & { id?: string },
-): EmailRecord {
+export function createEmail(input: CreateEmailInput): EmailRecord {
   const data = load();
-  const stamp = now();
-  const email: EmailRecord = {
-    ...input,
-    id: input.id ?? randomUUID(),
-    toAddresses: input.toAddresses ?? [],
-    ccAddresses: input.ccAddresses ?? [],
-    attachments: input.attachments ?? [],
-    createdAt: stamp,
-    updatedAt: stamp,
-  };
+  const email = newEmailRecord(input);
   data.emails.unshift(email);
   save(data);
   return email;
 }
 
-export function updateEmail(
-  userId: string,
-  emailId: string,
-  patch: Partial<
-    Pick<
-      EmailRecord,
-      | "status"
-      | "hasActionItem"
-      | "actionSummary"
-      | "chatId"
-      | "resendEmailId"
-      | "bodyText"
-      | "bodyHtml"
-    >
-  >,
-): EmailRecord | null {
+export function updateEmail(userId: string, emailId: string, patch: EmailPatch): EmailRecord | null {
   const data = load();
-  const index = data.emails.findIndex((row) => row.id === emailId);
+  const index = data.emails.findIndex((row) => row.userId === userId && row.id === emailId);
   if (index === -1) return null;
-  data.emails[index] = { ...data.emails[index], ...patch, updatedAt: now() };
+  data.emails[index] = applyEmailPatch(data.emails[index], patch);
   save(data);
-  return normalizeEmail(data.emails[index]);
+  return data.emails[index];
 }
 
 export type { ModelTier };

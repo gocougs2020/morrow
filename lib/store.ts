@@ -1,8 +1,9 @@
 import { ensureNeonAuthSchema, hasNeon } from "@/lib/db";
+import { generateInboundMailToken } from "@/lib/inbound-mail-token";
 import * as jsonStore from "@/lib/store-json";
 import * as pgStore from "@/lib/store-pg";
 
-export { titleFromPrompt } from "@/lib/store-json";
+export { titleFromPrompt } from "@/lib/store-logic";
 export type { ModelTier } from "@/lib/types";
 
 async function store() {
@@ -19,6 +20,31 @@ export async function getUserSettings(...args: Parameters<typeof jsonStore.getUs
 
 export async function upsertUserSettings(...args: Parameters<typeof jsonStore.upsertUserSettings>) {
   return (await store()).upsertUserSettings(...args);
+}
+
+export async function findUserIdByInboundMailToken(
+  ...args: Parameters<typeof jsonStore.findUserIdByInboundMailToken>
+) {
+  return (await store()).findUserIdByInboundMailToken(...args);
+}
+
+async function issueUniqueInboundMailToken(): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const token = generateInboundMailToken();
+    const existing = await findUserIdByInboundMailToken(token);
+    if (!existing) return token;
+  }
+  throw new Error("Unable to issue an inbound mail token.");
+}
+
+export async function ensureInboundMailToken(userId: string) {
+  const current = await getUserSettings(userId);
+  if (current.inboundMailToken) return current;
+  return upsertUserSettings(userId, { inboundMailToken: await issueUniqueInboundMailToken() });
+}
+
+export async function rotateInboundMailToken(userId: string) {
+  return upsertUserSettings(userId, { inboundMailToken: await issueUniqueInboundMailToken() });
 }
 
 export async function listChats(...args: Parameters<typeof jsonStore.listChats>) {
@@ -91,6 +117,10 @@ export async function deleteJob(...args: Parameters<typeof jsonStore.deleteJob>)
 
 export async function claimDueJobs(...args: Parameters<typeof jsonStore.claimDueJobs>) {
   return (await store()).claimDueJobs(...args);
+}
+
+export async function claimJob(...args: Parameters<typeof jsonStore.claimJob>) {
+  return (await store()).claimJob(...args);
 }
 
 export async function completeJob(...args: Parameters<typeof jsonStore.completeJob>) {

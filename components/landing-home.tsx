@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AgentChat } from "@/app/_components/agent-chat";
-import { Badge } from "@/components/ui/badge";
+import { SessionSourceMeta } from "@/components/session-source-meta";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { chatSourceLabels, normalizeChatSource, type ChatRecord } from "@/lib/types";
+import { filterSessionList } from "@/lib/session-list";
+import type { ChatRecord } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 
 const recentPreviewCount = 3;
@@ -33,7 +34,8 @@ export function LandingHome() {
 }
 
 function RecentSessions({ chats }: { chats: ChatRecord[] | undefined }) {
-  const visibleChats = chats?.slice(0, recentPreviewCount) ?? [];
+  const conversationChats = chats ? filterSessionList(chats, { includeScheduled: false }) : [];
+  const visibleChats = conversationChats.slice(0, recentPreviewCount);
 
   return (
     <section className="flex flex-col gap-3 mt-4">
@@ -56,9 +58,11 @@ function RecentSessions({ chats }: { chats: ChatRecord[] | undefined }) {
             <Skeleton className="h-12" />
           </div>
         </div>
-      ) : chats.length === 0 ? (
+      ) : conversationChats.length === 0 ? (
         <div className={`${recentPanelClass} px-4 py-10 text-center text-muted-foreground text-sm`}>
-          No sessions yet. Start with a skill above.
+          {chats.length === 0
+            ? "No sessions yet. Start with a skill above."
+            : "No recent conversations. Scheduled runs are in Sessions."}
         </div>
       ) : (
         <div className={`overflow-hidden ${recentPanelClass}`}>
@@ -73,13 +77,11 @@ function RecentSessions({ chats }: { chats: ChatRecord[] | undefined }) {
                 {chat.description ? (
                   <p className="line-clamp-2 text-muted-foreground text-xs">{chat.description}</p>
                 ) : null}
-                <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                  <Badge variant="secondary">
-                    {chatSourceLabels[normalizeChatSource(chat.source)]}
-                  </Badge>
-                  <span aria-hidden>·</span>
-                  <span>{formatRelativeTime(chat.updatedAt)}</span>
-                </div>
+                <SessionSourceMeta
+                  chat={chat}
+                  time={<span>{formatRelativeTime(chat.updatedAt)}</span>}
+                  variant="badge"
+                />
               </Link>
             </div>
           ))}
