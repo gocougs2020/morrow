@@ -1,6 +1,6 @@
 {
   "name": "morrow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A deployable workspace for eve agents. Don't wait for tomorrow—deploy an AI agent with Morrow",
   "author": "Logan Dziuk",
   "license": "MIT",
