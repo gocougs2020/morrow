@@ -1,11 +1,11 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { requireUser } from "../lib/identity";
-import { toClientEmail } from "../../lib/email-inbox";
+import { ensureStoredEmailContent, toClientEmail } from "../../lib/email-inbox";
 import { getEmail } from "../../lib/store";
 
 export default defineTool({
-  description: "Read one stored inbox email by id, including the full body.",
+  description: "Read one stored inbox email by id, including the full HTML and plain-text body.",
   inputSchema: z.object({
     id: z.string().min(1),
   }),
@@ -15,6 +15,6 @@ export default defineTool({
     if (!email) {
       throw new Error("Email not found.");
     }
-    return toClientEmail(email);
+    return toClientEmail(await ensureStoredEmailContent(email));
   },
 });

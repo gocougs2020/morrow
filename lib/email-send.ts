@@ -1,5 +1,6 @@
 import { APP_NAME } from "@/lib/brand";
 import { getDocumentBlob } from "@/lib/blob-store";
+import { textToHtml } from "@/lib/email-content";
 import { persistEmailEmbeddings } from "@/lib/email-embeddings";
 import { parseAddressList } from "@/lib/email-users";
 import { composeInboundMailAddress } from "@/lib/inbound-mail-token";
@@ -19,17 +20,6 @@ export type SendEmailInput = {
   chatId?: string | null;
   idempotencyKey: string;
 };
-
-function textToHtml(text: string): string {
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return `<div>${escaped
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br />")}</p>`)
-    .join("")}</div>`;
-}
 
 async function documentAttachments(
   userId: string,

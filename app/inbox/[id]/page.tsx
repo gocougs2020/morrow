@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { EmailDetail, type ClientEmail } from "@/components/email-inbox";
-import { toClientEmail } from "@/lib/email-inbox";
+import { ensureStoredEmailContent, toClientEmail } from "@/lib/email-inbox";
 import { requireSession } from "@/lib/session";
 import { getEmail } from "@/lib/store";
 
@@ -13,5 +13,5 @@ export default async function InboxEmailPage({
   const { id } = await params;
   const email = await getEmail(session.user.id, id);
   if (!email) notFound();
-  return <EmailDetail email={toClientEmail(email) as ClientEmail} />;
+  return <EmailDetail email={toClientEmail(await ensureStoredEmailContent(email)) as ClientEmail} />;
 }

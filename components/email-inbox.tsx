@@ -248,7 +248,7 @@ export function EmailDetail({ email }: { readonly email: ClientEmail }) {
             ) : null}
           </dl>
           <pre className="whitespace-pre-wrap px-4 py-4 font-sans text-sm leading-6">
-            {email.bodyText || stripHtml(email.bodyHtml) || "(empty)"}
+            {email.bodyText || "(empty)"}
           </pre>
         </article>
 
@@ -268,8 +268,4 @@ export function EmailDetail({ email }: { readonly email: ClientEmail }) {
       </main>
     </div>
   );
-}
-
-function stripHtml(value: string): string {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }

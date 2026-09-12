@@ -6,7 +6,7 @@ import { listEmails } from "../../lib/store";
 
 export default defineTool({
   description:
-    "List or search the user's email inbox (inbound and outbound). Use query to find messages by subject, body, or a description of the email.",
+    "List or search the user's email inbox (inbound and outbound). Use query to find messages by subject, body, or a description of the email. Results include a text preview; call read_email for the full HTML and text body.",
   inputSchema: z.object({
     query: z
       .string()
@@ -25,12 +25,12 @@ export default defineTool({
         limit,
       });
       return results.map((hit) => ({
-        ...toClientEmail(hit.email),
+        ...toClientEmail(hit.email, { includeBodies: false, bodyPreviewChars: 4_000 }),
         match: hit.match,
         score: hit.score,
       }));
     }
     const emails = await listEmails(user.userId, { direction: input.direction, limit });
-    return emails.map(toClientEmail);
+    return emails.map((email) => toClientEmail(email, { includeBodies: false, bodyPreviewChars: 4_000 }));
   },
 });

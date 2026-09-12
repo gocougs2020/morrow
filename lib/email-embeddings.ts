@@ -1,3 +1,4 @@
+import { emailBodyForEmbedding } from "@/lib/email-content";
 import { embedTexts } from "@/lib/embeddings";
 import { upsertEmbedding } from "@/lib/store";
 import { runWithUsageScope } from "@/lib/usage-scope";
@@ -13,7 +14,7 @@ export const EMAIL_SEARCH_MIN_SCORE = 0.32;
 export async function persistEmailEmbeddings(email: EmailRecord): Promise<void> {
   try {
     const subject = email.subject.trim();
-    const body = email.bodyText.trim() || email.bodyHtml.trim();
+    const body = emailBodyForEmbedding(email);
     const [subjectEmbedding, bodyEmbedding] = await runWithUsageScope({ userId: email.userId }, () =>
       embedTexts([subject, body]),
     );

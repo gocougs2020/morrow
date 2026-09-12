@@ -1,4 +1,10 @@
 import { classifyEmailAction, emailActionSessionPrompt } from "@/lib/email-classify";
+import {
+  emailBodyForEmbedding,
+  emailHasCompleteBodies,
+  fetchReceivedEmailContent,
+  normalizeEmailBodies,
+} from "@/lib/email-content";
 import { EMAIL_EMBEDDING_KINDS, EMAIL_SEARCH_MIN_SCORE, persistEmailEmbeddings } from "@/lib/email-embeddings";
 import { findUserById, normalizeEmailAddress, parseAddressList } from "@/lib/email-users";
 import {
@@ -7,7 +13,6 @@ import {
   isUserAgentInboundRecipient,
 } from "@/lib/inbound-mail-token";
 import { embedTexts } from "@/lib/embeddings";
-import { getResend } from "@/lib/resend";
 import {
   createChat,
   createEmail,
@@ -61,7 +66,7 @@ export async function searchUserInbox(
 
   for (const email of emails) {
     const subject = email.subject.toLowerCase();
-    const body = email.bodyText.toLowerCase();
+    const body = emailBodyForEmbedding(email).toLowerCase();
     const people = [email.fromAddress, ...email.toAddresses].join(" ").toLowerCase();
     let score = 0;
     let match: EmailSearchHit["match"] = "similar";
@@ -109,11 +114,18 @@ export async function searchUserInbox(
   return [...hits.values()].sort((left, right) => right.score - left.score).slice(0, limit);
 }
 
-export function toClientEmail(email: EmailRecord) {
+export function toClientEmail(
+  email: EmailRecord,
+  options?: { includeBodies?: boolean; bodyPreviewChars?: number },
+) {
+  const includeBodies = options?.includeBodies ?? true;
+  const previewChars = options?.bodyPreviewChars ?? 1_500;
   return {
     ...email,
     href: `/inbox/${email.id}`,
     sessionHref: email.chatId ? `/s/${email.chatId}` : null,
+    bodyText: includeBodies ? email.bodyText : emailBodyForEmbedding(email).slice(0, previewChars),
+    bodyHtml: includeBodies ? email.bodyHtml : "",
   };
 }
 
@@ -174,11 +186,86 @@ export async function startEmailActionSession(email: EmailRecord, prompt: string
   return chat.id;
 }
 
+function webhookAttachments(eventData: InboundEmailPayload): EmailRecord["attachments"] {
+  return (eventData.attachments ?? []).map((attachment) => ({
+    filename: attachment.filename || "attachment",
+    contentType: attachment.contentType || attachment.content_type || "application/octet-stream",
+    size: typeof attachment.size === "number" ? attachment.size : null,
+  }));
+}
+
+async function backfillStoredEmailBodies(email: EmailRecord, resendEmailId: string | undefined): Promise<EmailRecord> {
+  const derived = normalizeEmailBodies({ html: email.bodyHtml, text: email.bodyText });
+  if (emailHasCompleteBodies(derived)) {
+    const updated =
+      (await updateEmail(email.userId, email.id, {
+        bodyText: derived.bodyText,
+        bodyHtml: derived.bodyHtml,
+      })) ?? { ...email, ...derived };
+    await persistEmailEmbeddings(updated);
+    return updated;
+  }
+  if (!resendEmailId) return email;
+
+  const content = await fetchReceivedEmailContent(resendEmailId);
+  const updated =
+    (await updateEmail(email.userId, email.id, {
+      bodyText: content.bodyText,
+      bodyHtml: content.bodyHtml,
+    })) ?? { ...email, bodyText: content.bodyText, bodyHtml: content.bodyHtml };
+  await persistEmailEmbeddings(updated);
+  return updated;
+}
+
+export async function ensureStoredEmailContent(email: EmailRecord): Promise<EmailRecord> {
+  if (emailHasCompleteBodies(email) || !email.resendEmailId) return email;
+  try {
+    return await backfillStoredEmailBodies(email, email.resendEmailId);
+  } catch (error) {
+    console.error("[email] body backfill failed", { emailId: email.id, error });
+    return email;
+  }
+}
+
+async function maybeStartInboundActionSession(email: EmailRecord, recipients: string[], fromAddress: string) {
+  const owner = await findUserById(email.userId);
+  const settings = await getUserSettings(email.userId);
+  if (
+    !inboundMailAuthorizesUnattendedSession({
+      recipients,
+      fromAddress,
+      ownerToken: settings.inboundMailToken,
+      ownerEmail: owner?.email,
+    })
+  ) {
+    return;
+  }
+
+  const action = await classifyEmailAction(email);
+  if (!action.hasActionItem) return;
+
+  const withAction =
+    (await updateEmail(email.userId, email.id, {
+      hasActionItem: true,
+      actionSummary: action.summary || action.prompt || email.subject || "Email to agent",
+    })) ?? email;
+  const prompt = emailActionSessionPrompt(withAction, {
+    hasActionItem: true,
+    summary: action.summary || action.prompt || withAction.actionSummary || "",
+    prompt: action.prompt || action.summary || "Complete the request in this email.",
+  });
+  await startEmailActionSession(withAction, prompt);
+}
+
 export async function processInboundResendEmail(eventData: InboundEmailPayload): Promise<EmailRecord | null> {
   const resendEmailId = eventData.emailId?.trim();
   if (resendEmailId) {
     const existing = await getEmailByResendId(resendEmailId);
-    if (existing) return existing;
+    if (existing) {
+      return emailHasCompleteBodies(existing)
+        ? existing
+        : backfillStoredEmailBodies(existing, resendEmailId);
+    }
   }
 
   const toAddresses = parseAddressList(eventData.to);
@@ -198,67 +285,35 @@ export async function processInboundResendEmail(eventData: InboundEmailPayload):
     console.info("[email] inbound ignored; no matching user", { fromAddress, recipients });
     return null;
   }
-  const settings = await getUserSettings(owner.id);
-  if (
-    !inboundMailAuthorizesUnattendedSession({
-      recipients,
-      fromAddress,
-      ownerToken: settings.inboundMailToken,
-      ownerEmail: owner.email,
-    })
-  ) {
-    console.info("[email] inbound ignored; From is not the address owner", { fromAddress, recipients });
+
+  if (!resendEmailId) {
+    console.error("[email] inbound missing Resend email id; cannot fetch body");
     return null;
   }
 
-  let bodyText = "";
-  let bodyHtml = "";
-  let subject = eventData.subject?.trim() ?? "";
-  if (resendEmailId) {
-    const { data, error } = await getResend().emails.receiving.get(resendEmailId);
-    if (error) {
-      console.error("[email] receiving.get failed", { resendEmailId, error });
-    } else if (data) {
-      bodyText = (data.text ?? "").trim();
-      bodyHtml = (data.html ?? "").trim();
-      subject = (data.subject ?? subject).trim();
-    }
-  }
+  const content = await fetchReceivedEmailContent(resendEmailId);
+  const storedFrom = content.from ? normalizeEmailAddress(content.from) : fromAddress;
+  const storedTo = content.to.length > 0 ? content.to : toAddresses;
+  const storedCc = content.cc.length > 0 ? content.cc : ccAddresses;
 
   const email = await createEmail({
     userId: owner.id,
     direction: "inbound",
-    fromAddress: fromAddress || "unknown",
-    toAddresses,
-    ccAddresses,
-    subject,
-    bodyText,
-    bodyHtml,
-    resendEmailId: resendEmailId || null,
+    fromAddress: storedFrom || fromAddress || "unknown",
+    toAddresses: storedTo,
+    ccAddresses: storedCc,
+    subject: content.subject || eventData.subject?.trim() || "",
+    bodyText: content.bodyText,
+    bodyHtml: content.bodyHtml,
+    resendEmailId,
     status: "received",
     hasActionItem: false,
     actionSummary: null,
     chatId: null,
     inReplyTo: null,
-    attachments: (eventData.attachments ?? []).map((attachment) => ({
-      filename: attachment.filename || "attachment",
-      contentType: attachment.contentType || attachment.content_type || "application/octet-stream",
-      size: typeof attachment.size === "number" ? attachment.size : null,
-    })),
+    attachments: content.attachments.length > 0 ? content.attachments : webhookAttachments(eventData),
   });
-  void persistEmailEmbeddings(email);
-
-  const action = await classifyEmailAction(email);
-  const withAction =
-    (await updateEmail(owner.id, email.id, {
-      hasActionItem: true,
-      actionSummary: action.summary || action.prompt || email.subject || "Email to agent",
-    })) ?? email;
-  const prompt = emailActionSessionPrompt(withAction, {
-    hasActionItem: true,
-    summary: action.summary || action.prompt || withAction.actionSummary || "",
-    prompt: action.prompt || action.summary || "Complete the request in this email.",
-  });
-  await startEmailActionSession(withAction, prompt);
-  return (await getEmail(owner.id, email.id)) ?? withAction;
+  await persistEmailEmbeddings(email);
+  await maybeStartInboundActionSession(email, recipients, fromAddress);
+  return (await getEmail(owner.id, email.id)) ?? email;
 }

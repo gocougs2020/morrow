@@ -10,6 +10,8 @@ export default async function InboxPage() {
     return <AuthForm mode="sign-in" />;
   }
 
-  const emails = (await listEmails(session.user.id)).map(toClientEmail) as ClientEmail[];
+  const emails = (await listEmails(session.user.id)).map((email) =>
+    toClientEmail(email, { includeBodies: false, bodyPreviewChars: 0 }),
+  ) as ClientEmail[];
   return <EmailInbox emails={emails} />;
 }

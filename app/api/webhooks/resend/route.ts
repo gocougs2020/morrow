@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ReceivedEmailContentError } from "@/lib/email-content";
 import { processInboundResendEmail } from "@/lib/email-inbox";
 import { getResend, resendConfigured } from "@/lib/resend";
 
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
     return new NextResponse("OK", { status: 200 });
   } catch (error) {
     console.error("[email] webhook failed", error);
+    if (error instanceof ReceivedEmailContentError && !error.retryable) {
+      return new NextResponse("OK", { status: 200 });
+    }
     return new NextResponse("Error", { status: 400 });
   }
 }

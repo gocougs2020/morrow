@@ -1,6 +1,7 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { appConfig } from "@/app.config";
+import { emailBodyForEmbedding } from "@/lib/email-content";
 import { recordGenerateTextUsage } from "@/lib/record-usage";
 import { runWithUsageScope } from "@/lib/usage-scope";
 import type { EmailRecord } from "@/lib/types";
@@ -37,7 +38,7 @@ const CLASSIFY_SYSTEM = [
 export async function classifyEmailAction(email: EmailRecord): Promise<EmailActionClassification> {
   const fallback: EmailActionClassification = { hasActionItem: false, summary: "", prompt: "" };
   const subject = email.subject.trim();
-  const body = (email.bodyText || email.bodyHtml).trim().slice(0, 8_000);
+  const body = emailBodyForEmbedding(email).slice(0, 8_000);
   if (!subject && !body) return fallback;
 
   try {
@@ -79,7 +80,7 @@ export function emailActionSessionPrompt(
     email.id ? `Inbox email id: ${email.id}` : null,
     "",
     "--- email ---",
-    email.bodyText.trim() || email.bodyHtml.trim() || "(empty)",
+    emailBodyForEmbedding(email) || "(empty)",
     "--- end email ---",
     "",
     action.prompt || "Complete the request in this email.",

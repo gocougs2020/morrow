@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/api";
-import { searchUserInbox, toClientEmail } from "@/lib/email-inbox";
+import { ensureStoredEmailContent, searchUserInbox, toClientEmail } from "@/lib/email-inbox";
 import { getEmail, listEmails } from "@/lib/store";
 import type { EmailDirection } from "@/lib/types";
 
@@ -20,16 +20,22 @@ export async function GET(request: Request) {
   if (id) {
     const email = await getEmail(session.user.id, id);
     if (!email) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ email: toClientEmail(email) });
+    return NextResponse.json({ email: toClientEmail(await ensureStoredEmailContent(email)) });
   }
 
   if (query) {
     const results = await searchUserInbox(session.user.id, query, { direction });
     return NextResponse.json({
-      emails: results.map((hit) => ({ ...toClientEmail(hit.email), match: hit.match, score: hit.score })),
+      emails: results.map((hit) => ({
+        ...toClientEmail(hit.email, { includeBodies: false, bodyPreviewChars: 0 }),
+        match: hit.match,
+        score: hit.score,
+      })),
     });
   }
 
   const emails = await listEmails(session.user.id, { direction });
-  return NextResponse.json({ emails: emails.map(toClientEmail) });
+  return NextResponse.json({
+    emails: emails.map((email) => toClientEmail(email, { includeBodies: false, bodyPreviewChars: 0 })),
+  });
 }
