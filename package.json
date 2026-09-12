@@ -79,8 +79,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "24.x",
-    "@types/react": "19.2.15",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "just-bash": "^3.4.2",
