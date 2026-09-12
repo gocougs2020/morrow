@@ -1,13 +1,7 @@
 export type ResourceVisibility = "private" | "shared" | "public";
 
-/** Settings and memories shared with every user on this deployment. */
-export const ACCOUNT_SCOPE_ID = "__account__";
-
 /** Explicit file/folder share values. Legacy `"account"` is not included. */
 export const LIBRARY_SHARE_VALUES = ["shared", "public"] as const;
-
-/** Skills and jobs still accept the older `"account"` share value. */
-export const TEAM_SHARE_VALUES = ["shared", "public", "account"] as const;
 
 export function parseVisibility(value: unknown): ResourceVisibility | undefined {
   if (value === "private" || value === "shared" || value === "public") return value;

@@ -1,6 +1,6 @@
 # Security
 
-Morrow is a starter you deploy yourself. You are responsible for the secrets, allowlists, and data on your copy.
+Jarvis is a starter you deploy yourself. You are responsible for the secrets, allowlists, and data on your copy.
 
 ## Report a vulnerability
 

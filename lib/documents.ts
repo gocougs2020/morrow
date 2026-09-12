@@ -34,7 +34,6 @@ import {
   listChatDocuments,
   listDocumentChats,
   listDocuments,
-  listDocumentsInFolder,
   listFolders,
   searchUserEmbeddings,
   updateDocument,
@@ -288,14 +287,6 @@ export async function readDocumentText(document: DocumentRecord): Promise<string
 export async function listUserDocuments(userId: string, chatId?: string) {
   const [documents, folders] = await Promise.all([
     chatId ? listChatDocuments(userId, chatId) : listDocuments(userId),
-    listFolders(userId),
-  ]);
-  return documents.map((document) => toClientDocument(document, folders, userId));
-}
-
-export async function listUserDocumentsInFolder(userId: string, folderId: string | null) {
-  const [documents, folders] = await Promise.all([
-    listDocumentsInFolder(userId, folderId),
     listFolders(userId),
   ]);
   return documents.map((document) => toClientDocument(document, folders, userId));

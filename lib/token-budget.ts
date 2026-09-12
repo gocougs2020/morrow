@@ -24,7 +24,3 @@ export function turnContextWindowTokens(modelId: string): number {
     Math.floor(modelContextWindowTokens(modelId) * MODEL_CAPACITY_COMPACTION_RATIO),
   );
 }
-
-export function turnTokenBudget(modelId: string | undefined): number {
-  return modelId === undefined ? TURN_TOKEN_HARD_CAP : turnContextWindowTokens(modelId);
-}

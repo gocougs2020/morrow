@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import type { ProfileMemory } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, fetchJson } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
 const MEMORY_FIELD_MIN_HEIGHT = "calc(1lh + 1rem + 2px)";
@@ -93,11 +93,7 @@ export function MemorySettings({ active = true }: { readonly active?: boolean })
     setError(undefined);
     void (async () => {
       try {
-        const response = await fetch("/api/memories", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: nextText }),
-        });
+        const response = await fetchJson("/api/memories", "POST", { text: nextText });
         setMemories(await parseMemoriesResponse(response));
         setNextText("");
         setAdding(false);
@@ -229,11 +225,7 @@ function SavedMemoryRow({
       onError(undefined);
       void (async () => {
         try {
-          const response = await fetch("/api/memories", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ index: memory.index, text }),
-          });
+          const response = await fetchJson("/api/memories", "PATCH", { index: memory.index, text });
           const next = await parseMemoriesResponse(response);
           if (!ignore) onMemoriesChange(next);
         } catch (saveError) {
@@ -253,11 +245,7 @@ function SavedMemoryRow({
     setDeleting(true);
     onError(undefined);
     try {
-      const response = await fetch("/api/memories", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ index: memory.index }),
-      });
+      const response = await fetchJson("/api/memories", "DELETE", { index: memory.index });
       onMemoriesChange(await parseMemoriesResponse(response));
     } catch (saveError) {
       onError(saveError instanceof Error ? saveError.message : "Unable to update memories.");

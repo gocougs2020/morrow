@@ -1,7 +1,7 @@
 ---
 name: review-pr
 description: >-
-  Triage an incoming GitHub pull request for Morrow: summarize added or
+  Triage an incoming GitHub pull request for Jarvis: summarize added or
   removed functionality, list pros, list concerns (security, UI, UX, bloat,
   skill-slot), and give a merge score. Use when the user pastes a PR URL or
   number, asks to review or triage a contributor PR, or runs /review-pr.
@@ -51,7 +51,7 @@ Use this exact heading structure:
 **CI:** <pass / fail / pending / unknown> — one line
 
 ## Functionality
-What this PR adds or removes for a person using or deploying Morrow.
+What this PR adds or removes for a person using or deploying Jarvis.
 Bullets. Call out no-ops, refactors with no user-visible change, and
 drive-by rewrites.
 

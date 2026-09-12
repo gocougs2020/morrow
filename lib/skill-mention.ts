@@ -1,5 +1,4 @@
 import { appConfig } from "@/app.config";
-import { SKILL_NAME_PATTERN } from "@/lib/skill-document";
 
 const SKILL_MENTION_PATTERN = /\/([a-z0-9]+(?:-[a-z0-9]+)*)/gi;
 const SLASH_QUERY_PATTERN = /(^|[\s])\/([a-z0-9-]*)$/i;
@@ -13,10 +12,6 @@ export type SlashQuery = {
   start: number;
   query: string;
 };
-
-export function isSkillSlug(value: string): boolean {
-  return SKILL_NAME_PATTERN.test(value);
-}
 
 export function skillMention(slug: string): string {
   return `/${slug}`;

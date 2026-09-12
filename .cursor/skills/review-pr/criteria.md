@@ -1,7 +1,7 @@
-# Morrow PR criteria
+# Jarvis PR criteria
 
-Starter you fork and deploy — not a hosted multi-tenant product. One Vercel
-project is one workspace. Shared files, skills, and schedules are visible to
+Starter you fork and deploy — not a hosted multi-tenant product. One
+deployment is one workspace. Shared files, skills, and schedules are visible to
 every signed-in account on that deployment.
 
 ## On-mission

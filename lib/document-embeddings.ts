@@ -1,6 +1,6 @@
 import { isTextDocumentKind } from "@/lib/document-kind";
 import { embedTexts } from "@/lib/embeddings";
-import { deleteEmbeddingsForSource, getDocument, listDocuments, listUserEmbeddings, upsertEmbedding } from "@/lib/store";
+import { deleteEmbeddingsForSource, upsertEmbedding } from "@/lib/store";
 import { runWithUsageScope } from "@/lib/usage-scope";
 import type { DocumentFolder, DocumentRecord, EmbeddingKind } from "@/lib/types";
 
@@ -106,29 +106,4 @@ export async function persistFolderEmbeddings(folder: DocumentFolder): Promise<v
 
 export async function removeDocumentEmbeddings(userId: string, documentId: string): Promise<void> {
   await deleteEmbeddingsForSource(userId, "document", documentId);
-}
-
-export async function backfillMissingDocumentEmbeddings(
-  userId: string,
-  readText: (document: DocumentRecord) => Promise<string>,
-  limit = 8,
-): Promise<void> {
-  const [documents, existing] = await Promise.all([
-    listDocuments(userId),
-    listUserEmbeddings(userId, DOCUMENT_EMBEDDING_KINDS),
-  ]);
-  const embedded = new Set(existing.map((row) => row.sourceId));
-  const missing = documents.filter((document) => !embedded.has(document.id)).slice(0, limit);
-  for (const document of missing) {
-    const latest = (await getDocument(userId, document.id)) ?? document;
-    let content = "";
-    if (isTextDocumentKind(latest.kind)) {
-      try {
-        content = await readText(latest);
-      } catch {
-        content = "";
-      }
-    }
-    await persistDocumentEmbeddings(latest, { content });
-  }
 }

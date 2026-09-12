@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in Morrow that a fork should know about.
+What changed in Jarvis that a fork should know about.
 
 When you pull `main`, keep your customized [`app.config.ts`](./app.config.ts) — especially the `models` block. Brand, home copy, related-session and reminder-email floors, and skill enablement live in that file too. Secrets and who can sign in stay in `.env.local` / Vercel env. They are not in this repo.
 

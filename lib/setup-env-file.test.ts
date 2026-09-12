@@ -6,14 +6,14 @@ import { localEnvFilePath, upsertEnvFile } from "@/lib/setup-env-file";
 
 describe("upsertEnvFile", () => {
   it("creates a file when none exists", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "morrow-setup-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "jarvis-setup-"));
     const file = path.join(dir, ".env.local");
     upsertEnvFile(file, "BETTER_AUTH_SECRET", "abc123");
     expect(readFileSync(file, "utf8")).toBe("BETTER_AUTH_SECRET=abc123\n");
   });
 
   it("replaces an existing key and leaves other lines alone", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "morrow-setup-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "jarvis-setup-"));
     const file = path.join(dir, ".env.local");
     writeFileSync(file, "AI_GATEWAY_API_KEY=keep\nBETTER_AUTH_SECRET=\n", "utf8");
     upsertEnvFile(file, "BETTER_AUTH_SECRET", "new-secret");
@@ -23,7 +23,7 @@ describe("upsertEnvFile", () => {
   });
 
   it("appends when the key is missing", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "morrow-setup-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "jarvis-setup-"));
     const file = path.join(dir, ".env.local");
     writeFileSync(file, "AI_GATEWAY_API_KEY=keep", "utf8");
     upsertEnvFile(file, "ALLOWED_SIGNUP_EMAILS", "you@example.com");
@@ -35,6 +35,6 @@ describe("upsertEnvFile", () => {
 
 describe("localEnvFilePath", () => {
   it("points at .env.local in the project root", () => {
-    expect(localEnvFilePath("/tmp/morrow")).toBe(path.join("/tmp/morrow", ".env.local"));
+    expect(localEnvFilePath("/tmp/jarvis")).toBe(path.join("/tmp/jarvis", ".env.local"));
   });
 });

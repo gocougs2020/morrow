@@ -41,7 +41,7 @@ import { parseSettingsTab, type SettingsTab } from "@/lib/settings-tab";
 import { skillDisplayName } from "@/lib/skill-display-name";
 import type { ScheduledJob, UserSettings, UserSkill } from "@/lib/types";
 import type { HostSchedulePlanInfo } from "@/lib/vercel-plan";
-import { cn } from "@/lib/utils";
+import { cn, fetchJson } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
 const settingsTabTriggerClassName = "flex-none rounded-none border-none px-0 shadow-none";
@@ -119,11 +119,7 @@ export function SettingsPanel({
   }, []);
 
   const saveSettings = async (patch: Partial<UserSettings>) => {
-    const response = await fetch("/api/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
+    const response = await fetchJson("/api/settings", "PATCH", patch);
     if (!response.ok) return;
     const payload = (await response.json()) as { settings: UserSettings };
     setSavedOverlay(payload.settings.instructionOverlay);
@@ -143,14 +139,10 @@ export function SettingsPanel({
     setGeneratingOverlay(true);
     setOverlayError(undefined);
     try {
-      const response = await fetch("/api/instructions/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          current: overlay,
-          kind: "overlay",
-          prompt: trimmed,
-        }),
+      const response = await fetchJson("/api/instructions/generate", "POST", {
+        current: overlay,
+        kind: "overlay",
+        prompt: trimmed,
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -180,11 +172,11 @@ export function SettingsPanel({
   };
 
   const saveSkill = async (draft: SkillDraft, skillId?: string) => {
-    const response = await fetch("/api/skills", {
-      method: skillId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(skillId ? { id: skillId, ...draft } : draft),
-    });
+    const response = await fetchJson(
+      "/api/skills",
+      skillId ? "PATCH" : "POST",
+      skillId ? { id: skillId, ...draft } : draft,
+    );
     const payload = (await response.json().catch(() => ({}))) as {
       error?: string;
       skill?: UserSkill;
@@ -549,11 +541,7 @@ function SkillRow({
         <Switch
           checked={skill.enabled}
           onCheckedChange={(enabled) => {
-            void fetch("/api/skills", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id: skill.id, enabled }),
-            }).then(() => onRefresh());
+            void fetchJson("/api/skills", "PATCH", { id: skill.id, enabled }).then(() => onRefresh());
           }}
         />
         <AlertDialog>
@@ -579,11 +567,7 @@ function SkillRow({
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  void fetch("/api/skills", {
-                    method: "DELETE",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: skill.id }),
-                  }).then(() => onRefresh());
+                  void fetchJson("/api/skills", "DELETE", { id: skill.id }).then(() => onRefresh());
                 }}
               >
                 Delete

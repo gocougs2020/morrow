@@ -565,23 +565,6 @@ export async function listDocuments(userId: string): Promise<DocumentRecord[]> {
   return rows.map(mapDocument);
 }
 
-export async function listDocumentsInFolder(
-  userId: string,
-  folderId: string | null,
-): Promise<DocumentRecord[]> {
-  const rows = await getNeonDb()
-    .select()
-    .from(pgDocuments)
-    .where(
-      and(
-        or(eq(pgDocuments.userId, userId), inArray(pgDocuments.visibility, LIBRARY_SHARE_VALUES)),
-        folderId ? eq(pgDocuments.folderId, folderId) : isNull(pgDocuments.folderId),
-      ),
-    )
-    .orderBy(desc(pgDocuments.updatedAt));
-  return rows.map(mapDocument);
-}
-
 export async function listFolders(userId: string): Promise<DocumentFolder[]> {
   const rows = await getNeonDb()
     .select()

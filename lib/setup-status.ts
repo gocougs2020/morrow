@@ -3,6 +3,14 @@ import { isAuthSecretConfigured } from "@/lib/auth-secret";
 import { hasBlobStore } from "@/lib/blob-store";
 import { hasNeon } from "@/lib/db";
 
+export {
+  REQUIRED_SETUP_STEP_IDS,
+  nextOpenRequiredSetupStep,
+  shouldShowRequiredSetupStep,
+  visibleRequiredSetupSteps,
+  type RequiredSetupStepId,
+} from "@/lib/setup-steps";
+
 export type SetupStatus = {
   /** Hide the setup screen when this is true. */
   allowlist: boolean;

@@ -298,5 +298,3 @@ export type UsageRecord = {
   costUsd: number;
   createdAt: string;
 };
-
-export const SYSTEM_EMBEDDING_USER_ID = "__system__";

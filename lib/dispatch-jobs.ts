@@ -1,5 +1,6 @@
 import { Client } from "eve/client";
 import { hasNeon } from "@/lib/db";
+import { findUserById } from "@/lib/email-users";
 import { reminderContextForDispatch } from "@/lib/reminder-context";
 import {
   isNudgeReminderSchedule,
@@ -42,6 +43,65 @@ export function scheduleDispatchSecret(): string | null {
     process.env.BETTER_AUTH_SECRET?.trim() ||
     null
   );
+}
+
+export function scheduleSessionAuth(input: {
+  userId: string;
+  authenticator?: string;
+  issuer?: string | null;
+  email?: string | null;
+  name?: string | null;
+  chatId?: string | null;
+  scheduleId?: string | null;
+  reminder?: boolean;
+}) {
+  const attributes: Record<string, string> = { source: "schedule" };
+  if (input.reminder) attributes.reminder = "1";
+  if (input.email) attributes.email = input.email;
+  if (input.name) attributes.name = input.name;
+  if (input.chatId) attributes.chatId = input.chatId;
+  if (input.scheduleId) attributes.scheduleId = input.scheduleId;
+  return {
+    authenticator: input.authenticator?.trim() || "better-auth",
+    ...(input.issuer ? { issuer: input.issuer } : {}),
+    principalId: input.userId,
+    principalType: "user" as const,
+    attributes,
+  };
+}
+
+export async function buildScheduleDispatch(
+  job: ScheduledJob,
+  chat: ChatRecord,
+  request?: Request,
+) {
+  const origin = appOrigin(request);
+  const owner = await findUserById(job.userId);
+  const context = isNudgeReminderSchedule(job.prompt)
+    ? await reminderContextForDispatch({
+        brief: parseSchedulePrompt(job.prompt).brief,
+        excludeChatId: chat.id,
+        origin,
+        userId: job.userId,
+      })
+    : undefined;
+  return {
+    message: scheduleDispatchMessage(job, {
+      chatId: chat.id,
+      context,
+      origin,
+    }),
+    auth: scheduleSessionAuth({
+      userId: job.userId,
+      authenticator: job.authenticator,
+      issuer: job.issuer,
+      email: owner?.email,
+      name: owner?.name,
+      chatId: chat.id,
+      scheduleId: job.id,
+      reminder: isReminderSchedule(job.prompt),
+    }),
+  };
 }
 
 function httpsOrigin(host: string | undefined): string | null {
@@ -189,21 +249,7 @@ export async function startScheduleSession(
   request?: Request,
 ): Promise<{ sessionId: string }> {
   const client = eveScheduleClient(job, chat, request);
-  const origin = appOrigin(request);
-  const context = isNudgeReminderSchedule(job.prompt)
-    ? await reminderContextForDispatch({
-        brief: parseSchedulePrompt(job.prompt).brief,
-        excludeChatId: chat.id,
-        origin,
-        userId: job.userId,
-      })
-    : undefined;
-  const { session } = await client.sessions.create({
-    message: scheduleDispatchMessage(job, {
-      chatId: chat.id,
-      context,
-      origin,
-    }),
-  });
+  const { message } = await buildScheduleDispatch(job, chat, request);
+  const { session } = await client.sessions.create({ message });
   return { sessionId: session.state.sessionId };
 }

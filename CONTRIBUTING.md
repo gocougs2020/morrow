@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for wanting to help. Morrow is a personal starter around [eve](https://eve.dev) — chat, files, memory, skills, and inbox — not a hosted product. Be decent; see the [code of conduct](./CODE_OF_CONDUCT.md).
+Thanks for wanting to help. Jarvis is a personal starter — chat, files, memory, skills, scheduled jobs, and inbox — not a hosted product. Be decent; see the [code of conduct](./CODE_OF_CONDUCT.md).
 
 ## Before you write code
 

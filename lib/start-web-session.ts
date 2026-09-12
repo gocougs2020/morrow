@@ -1,5 +1,6 @@
 import { Client } from "eve/client";
 import type { ChatRecord } from "@/lib/types";
+import { fetchJson } from "@/lib/utils";
 
 const CREATE_SESSION_ERROR = "Unable to start this session. Check your connection and try again.";
 
@@ -24,10 +25,9 @@ export function revealSessionPath(chatId: string) {
 }
 
 export async function createWebChat(prompt: string): Promise<ChatRecord> {
-  const response = await fetch("/api/chats", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: prompt || "New session", source: "web" }),
+  const response = await fetchJson("/api/chats", "POST", {
+    prompt: prompt || "New session",
+    source: "web",
   });
   if (!response.ok) {
     throw new Error(CREATE_SESSION_ERROR);

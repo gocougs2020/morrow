@@ -5,6 +5,9 @@ import {
   isCanonicalProductionAuthUrl,
   isHostedOnVercel,
   isSetupScreenVisible,
+  nextOpenRequiredSetupStep,
+  shouldShowRequiredSetupStep,
+  visibleRequiredSetupSteps,
 } from "@/lib/setup-status";
 
 const SETUP_ENV_KEYS = [
@@ -62,7 +65,7 @@ afterEach(() => {
 
 describe("isCanonicalProductionAuthUrl", () => {
   it("accepts an https public origin and rejects localhost", () => {
-    expect(isCanonicalProductionAuthUrl("https://morrow.vercel.app")).toBe(true);
+    expect(isCanonicalProductionAuthUrl("https://jarvis.vercel.app")).toBe(true);
     expect(isCanonicalProductionAuthUrl("https://app.example.com")).toBe(true);
     expect(isCanonicalProductionAuthUrl("http://localhost:3000")).toBe(false);
     expect(isCanonicalProductionAuthUrl("https://localhost")).toBe(false);
@@ -109,7 +112,7 @@ describe("getSetupStatus", () => {
 
   it("completes the production auth URL on Vercel when BETTER_AUTH_URL is public https", () => {
     process.env.VERCEL = "1";
-    process.env.BETTER_AUTH_URL = "https://morrow.vercel.app";
+    process.env.BETTER_AUTH_URL = "https://jarvis.vercel.app";
     expect(getSetupStatus().authUrl).toBe(true);
   });
 
@@ -128,6 +131,93 @@ describe("getSetupStatus", () => {
   it("marks account usage when ALLOWED_ACCOUNT_USAGE_EMAILS is set", () => {
     process.env.ALLOWED_ACCOUNT_USAGE_EMAILS = "you@example.com";
     expect(getSetupStatus().accountUsage).toBe(true);
+  });
+});
+
+describe("visibleRequiredSetupSteps", () => {
+  it("asks a local clone for .env.local values only", () => {
+    expect(visibleRequiredSetupSteps({ hosted: false, authSecret: false })).toEqual([
+      "authSecret",
+      "aiGateway",
+      "allowlist",
+    ]);
+    expect(visibleRequiredSetupSteps({ hosted: false, authSecret: true })).toEqual([
+      "authSecret",
+      "aiGateway",
+      "allowlist",
+    ]);
+    expect(shouldShowRequiredSetupStep("database", { hosted: false, authSecret: true })).toBe(false);
+    expect(shouldShowRequiredSetupStep("hosted", { hosted: false, authSecret: true })).toBe(false);
+  });
+
+  it("asks a Vercel deploy for project env, skipping local-only steps", () => {
+    expect(visibleRequiredSetupSteps({ hosted: true, authSecret: true })).toEqual([
+      "authUrl",
+      "database",
+      "blob",
+      "allowlist",
+    ]);
+    expect(shouldShowRequiredSetupStep("aiGateway", { hosted: true, authSecret: true })).toBe(false);
+    expect(shouldShowRequiredSetupStep("hosted", { hosted: true, authSecret: true })).toBe(false);
+  });
+
+  it("still shows the secret step on Vercel when BETTER_AUTH_SECRET is missing", () => {
+    expect(visibleRequiredSetupSteps({ hosted: true, authSecret: false })).toEqual([
+      "authSecret",
+      "authUrl",
+      "database",
+      "blob",
+      "allowlist",
+    ]);
+  });
+});
+
+describe("nextOpenRequiredSetupStep", () => {
+  const incomplete = {
+    authSecret: false,
+    aiGateway: false,
+    hosted: false,
+    authUrl: false,
+    database: false,
+    blob: false,
+    allowlist: false,
+  } as const;
+
+  it("opens AI Gateway after the secret on a local clone", () => {
+    expect(nextOpenRequiredSetupStep({ ...incomplete, authSecret: true })).toBe("aiGateway");
+  });
+
+  it("opens the public URL after the secret on Vercel, not the allowlist", () => {
+    expect(
+      nextOpenRequiredSetupStep({
+        ...incomplete,
+        hosted: true,
+        authSecret: true,
+        aiGateway: true,
+      }),
+    ).toBe("authUrl");
+  });
+
+  it("keeps hosted storage steps in order after the public URL", () => {
+    expect(
+      nextOpenRequiredSetupStep({
+        ...incomplete,
+        hosted: true,
+        authSecret: true,
+        aiGateway: true,
+        authUrl: true,
+      }),
+    ).toBe("database");
+    expect(
+      nextOpenRequiredSetupStep({
+        ...incomplete,
+        hosted: true,
+        authSecret: true,
+        aiGateway: true,
+        authUrl: true,
+        database: true,
+      }),
+    ).toBe("blob");
   });
 });
 

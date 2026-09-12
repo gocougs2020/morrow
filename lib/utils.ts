@@ -5,23 +5,13 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-const utcDateTime = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "UTC",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-export function formatTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const parts = utcDateTime.formatToParts(date);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")} UTC`;
+/** `fetch` with a JSON body. Callers still inspect the `Response` themselves. */
+export function fetchJson(input: string, method: string, body: unknown): Promise<Response> {
+  return fetch(input, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 const relativeTime = new Intl.RelativeTimeFormat(undefined, { numeric: "always" });

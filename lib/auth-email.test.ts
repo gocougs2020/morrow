@@ -15,7 +15,7 @@ const sendMock = vi.fn();
 
 vi.mock("@/lib/resend", () => ({
   resendConfigured: vi.fn(),
-  resendFromAddress: vi.fn(() => "Morrow <onboarding@resend.dev>"),
+  resendFromAddress: vi.fn(() => "Jarvis <onboarding@resend.dev>"),
   getResend: vi.fn(() => ({ emails: { send: sendMock } })),
 }));
 
@@ -24,13 +24,13 @@ import { resendConfigured } from "@/lib/resend";
 describe("verificationEmailContent", () => {
   it("names the app and includes the verify URL", () => {
     const content = verificationEmailContent({
-      appName: "Morrow",
+      appName: "Jarvis",
       verifyUrl: "https://example.com/api/auth/verify-email?token=abc",
     });
-    expect(content.subject).toBe("Verify your email for Morrow");
+    expect(content.subject).toBe("Verify your email for Jarvis");
     expect(content.text).toContain("https://example.com/api/auth/verify-email?token=abc");
     expect(content.html).toContain('href="https://example.com/api/auth/verify-email?token=abc"');
-    expect(content.html).toContain("Morrow");
+    expect(content.html).toContain("Jarvis");
   });
 
   it("escapes HTML in the app name and URL", () => {
@@ -127,7 +127,7 @@ describe("sendVerificationEmail", () => {
       { idempotencyKey: string },
     ];
     expect(payload.to).toBe("ada@example.com");
-    expect(payload.subject).toBe("Verify your email for Morrow");
+    expect(payload.subject).toBe("Verify your email for Jarvis");
     expect(payload.text).toContain("https://example.com/verify");
     expect(options.idempotencyKey).toBe("verify-email/user_1/abcdefghijklmnopqrstuvwx");
   });

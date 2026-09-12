@@ -19,6 +19,7 @@ import {
   listEmails,
   searchUserEmbeddings,
   titleFromPrompt,
+  updateChat,
   updateEmail,
 } from "@/lib/store";
 import { runWithUsageScope } from "@/lib/usage-scope";
@@ -116,10 +117,14 @@ export function toClientEmail(email: EmailRecord) {
   };
 }
 
-async function startEmailSessionNow(email: EmailRecord, prompt: string): Promise<boolean> {
+async function startEmailSessionNow(
+  email: EmailRecord,
+  prompt: string,
+  chatId: string,
+): Promise<string | null> {
   const secret = process.env.RESEND_WEBHOOK_SECRET ?? process.env.EMAIL_SESSION_SECRET;
   const origin = process.env.BETTER_AUTH_URL?.replace(/\/$/, "");
-  if (!secret || !origin) return false;
+  if (!secret || !origin) return null;
   const owner = await findUserById(email.userId);
   try {
     const response = await fetch(`${origin}/api/internal/email-sessions`, {
@@ -134,12 +139,15 @@ async function startEmailSessionNow(email: EmailRecord, prompt: string): Promise
         prompt,
         email: owner?.email,
         name: owner?.name,
+        chatId,
       }),
     });
-    return response.ok;
+    if (!response.ok) return null;
+    const payload = (await response.json().catch(() => ({}))) as { sessionId?: string };
+    return payload.sessionId?.trim() || null;
   } catch (error) {
     console.error("[email] immediate session start failed", error);
-    return false;
+    return null;
   }
 }
 
@@ -150,8 +158,10 @@ export async function startEmailActionSession(email: EmailRecord, prompt: string
     titleFromPrompt(email.actionSummary || email.subject || prompt),
     "email",
   );
-  const started = await startEmailSessionNow(email, prompt);
-  if (!started) {
+  const sessionId = await startEmailSessionNow(email, prompt, chat.id);
+  if (sessionId) {
+    await updateChat(email.userId, chat.id, { sessionId });
+  } else {
     await createJob(email.userId, {
       prompt,
       firstRunAt: new Date().toISOString(),

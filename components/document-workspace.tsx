@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileVisibilitySelect } from "@/components/visibility-toggle";
 import { documentKindLabel } from "@/lib/document-kind";
-import { formatBytes, formatRelativeTime, formatSessionUpdatedAt } from "@/lib/utils";
+import { fetchJson, formatBytes, formatRelativeTime, formatSessionUpdatedAt } from "@/lib/utils";
 import type { ChatRecord, ClientDocument } from "@/lib/types";
 import { isPublicVisibility, type ResourceVisibility } from "@/lib/visibility";
 
@@ -62,11 +62,7 @@ export function DocumentWorkspace({
   }) => {
     setSaving(true);
     setError(undefined);
-    const response = await fetch(`/api/documents/${document.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
+    const response = await fetchJson(`/api/documents/${document.id}`, "PATCH", patch);
     setSaving(false);
     if (!response.ok) {
       setError("Unable to save this file.");

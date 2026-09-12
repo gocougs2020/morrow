@@ -45,7 +45,7 @@ describe("inbound mail token", () => {
   });
 
   it("builds a plus-address from the inbound mailbox", () => {
-    env().RESEND_FROM_EMAIL = "Morrow <agent@example.com>";
+    env().RESEND_FROM_EMAIL = "Jarvis <agent@example.com>";
     delete env().RESEND_INBOUND_ADDRESSES;
     delete env().RESEND_INBOUND_DOMAINS;
     expect(inboundMailboxAddress()).toBe("agent@example.com");
@@ -59,7 +59,7 @@ describe("inbound mail token", () => {
   });
 
   it("accepts only a user plus-address on this app's mailbox", () => {
-    env().RESEND_FROM_EMAIL = "Morrow <agent@example.com>";
+    env().RESEND_FROM_EMAIL = "Jarvis <agent@example.com>";
     delete env().RESEND_INBOUND_ADDRESSES;
     delete env().RESEND_INBOUND_DOMAINS;
     expect(isUserAgentInboundRecipient(["agent+k7xqm-2n4pw@example.com"])).toBe(true);

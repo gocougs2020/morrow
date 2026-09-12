@@ -102,10 +102,3 @@ export async function generateSessionSummary({
     return { description: fallbackDescription, title: fallbackTitle };
   }
 }
-
-export async function generateSessionTitle(
-  input: Parameters<typeof generateSessionSummary>[0],
-): Promise<string> {
-  const summary = await generateSessionSummary(input);
-  return summary.title;
-}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { appOrigin, scheduleDispatchSecret } from "@/lib/dispatch-jobs";
+import { appOrigin, scheduleDispatchSecret, scheduleSessionAuth } from "@/lib/dispatch-jobs";
 import { normalizeChatSource } from "@/lib/types";
 
 const KEYS = [
@@ -61,5 +61,30 @@ describe("appOrigin", () => {
 describe("normalizeChatSource", () => {
   it("keeps schedule sessions labeled as schedule", () => {
     expect(normalizeChatSource("schedule")).toBe("schedule");
+  });
+});
+
+describe("scheduleSessionAuth", () => {
+  it("marks reminder runs and keeps chat identity", () => {
+    expect(
+      scheduleSessionAuth({
+        userId: "user-1",
+        email: "ada@example.com",
+        chatId: "chat-1",
+        scheduleId: "job-1",
+        reminder: true,
+      }),
+    ).toEqual({
+      authenticator: "better-auth",
+      principalId: "user-1",
+      principalType: "user",
+      attributes: {
+        source: "schedule",
+        reminder: "1",
+        email: "ada@example.com",
+        chatId: "chat-1",
+        scheduleId: "job-1",
+      },
+    });
   });
 });

@@ -11,7 +11,6 @@ import type {
   DocumentSessionLink,
   EmailDirection,
   EmailRecord,
-  ModelTier,
   ScheduledJob,
   EmbeddingKind,
   EmbeddingRecord,
@@ -64,8 +63,6 @@ import {
   scoreEmbeddingRecords,
 } from "@/lib/store-logic";
 import { isVisibleToViewer, normalizeLibraryVisibility, normalizeVisibility } from "@/lib/visibility";
-
-export { titleFromPrompt } from "@/lib/store-logic";
 
 type AppData = {
   chats: ChatRecord[];
@@ -411,13 +408,6 @@ export function listDocuments(userId: string): DocumentRecord[] {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export function listDocumentsInFolder(
-  userId: string,
-  folderId: string | null,
-): DocumentRecord[] {
-  return listDocuments(userId).filter((document) => (document.folderId ?? null) === folderId);
-}
-
 export function listFolders(userId: string): DocumentFolder[] {
   return load()
     .documentFolders.filter((folder) => isVisibleToViewer(folder, userId))
@@ -711,5 +701,3 @@ export function updateEmail(userId: string, emailId: string, patch: EmailPatch):
   save(data);
   return data.emails[index];
 }
-
-export type { ModelTier };

@@ -12,7 +12,7 @@ import type { ProfileMemory } from "./types";
 
 export const PROFILE_MEMORY_PREFIX = "eve/memory/profile";
 export const PROFILE_MEMORY_SLOT = "profile";
-export const PROFILE_MEMORY_NAMESPACE = "morrow-profile-v1";
+export const PROFILE_MEMORY_NAMESPACE = "jarvis-profile-v1";
 export const PROFILE_MEMORY_MAX_ENTRY_BYTES = 2048;
 export const PROFILE_MEMORY_MAX_DOCUMENT_BYTES = 65_536;
 export const PROFILE_MEMORY_MAX_CHARACTERS = 4_000;
@@ -283,7 +283,7 @@ function legacyProfileMemoryKeys(userId: string): string[] {
 
   add(PROFILE_MEMORY_NAMESPACE, "local-dev");
   for (const appRoot of [process.cwd(), ""]) {
-    for (const node of [ROOT_NODE_ID, "morrow", "agent"]) {
+    for (const node of [ROOT_NODE_ID, "jarvis", "agent"]) {
       const namespace = defaultNamespace({
         appRoot,
         node,

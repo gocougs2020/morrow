@@ -59,7 +59,7 @@ import {
 } from "@/lib/session-events";
 import { documentsFromToolOutput } from "@/lib/client-documents";
 import { isTextDocumentKind } from "@/lib/document-kind";
-import { cn } from "@/lib/utils";
+import { cn, fetchJson } from "@/lib/utils";
 import {
   catalogForAssistantMessage,
   parseSessionFromStack,
@@ -375,11 +375,7 @@ function AgentChatSession({
         .map((row) => (row.id === chatId ? { ...row, updatedAt } : row))
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     );
-    void fetch(`/api/chats/${chatId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ touchUpdatedAt: true }),
-    });
+    void fetchJson(`/api/chats/${chatId}`, "PATCH", { touchUpdatedAt: true });
   };
   // eslint-disable-next-line react-hooks/refs -- latest activity marker
   markSessionActivityRef.current = markSessionActivity;
@@ -387,18 +383,13 @@ function AgentChatSession({
   const persistSession = (session: ClientSessionState | undefined) => {
     const chatId = activeChatRef.current?.id;
     if (!chatId) return;
-    void fetch(`/api/chats/${chatId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        session
-          ? {
-              sessionId: session.sessionId,
-              streamIndex: session.streamIndex,
-            }
-          : { sessionId: null, streamIndex: 0 },
-      ),
-    });
+    void fetchJson(
+      `/api/chats/${chatId}`,
+      "PATCH",
+      session
+        ? { sessionId: session.sessionId, streamIndex: session.streamIndex }
+        : { sessionId: null, streamIndex: 0 },
+    );
   };
 
   const persistInFlight = useRef(false);
@@ -412,11 +403,7 @@ function AgentChatSession({
     if (!chatId) return;
     persistQueued.current = null;
     persistInFlight.current = true;
-    void fetch(`/api/chats/${chatId}/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ events }),
-    })
+    void fetchJson(`/api/chats/${chatId}/events`, "POST", { events })
       .catch(() => undefined)
       .finally(() => {
         persistInFlight.current = false;
@@ -442,11 +429,7 @@ function AgentChatSession({
       return;
     }
     upsertInFlight.current = true;
-    void fetch(`/api/chats/${chatId}/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next),
-    })
+    void fetchJson(`/api/chats/${chatId}/events`, "POST", next)
       .catch(() => undefined)
       .finally(() => {
         upsertInFlight.current = false;
@@ -483,11 +466,9 @@ function AgentChatSession({
           const chatId = activeChatRef.current?.id;
           if (chatId) {
             for (const document of documents) {
-              void fetch(`/api/documents/${document.id}/sessions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chatId }),
-              }).then(() => refreshSessionDocuments(document.id));
+              void fetchJson(`/api/documents/${document.id}/sessions`, "POST", { chatId }).then(
+                () => refreshSessionDocuments(document.id),
+              );
             }
           }
         }
@@ -545,13 +526,9 @@ function AgentChatSession({
       description: chatList.find((row) => row.id === current.id)?.description ?? current.description,
       title: chatTitle,
     };
-    void fetch(`/api/chats/${current.id}/title`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: sessionTitleMessages([...prior, prompt].filter(Boolean)),
-        prompt,
-      }),
+    void fetchJson(`/api/chats/${current.id}/title`, "POST", {
+      messages: sessionTitleMessages([...prior, prompt].filter(Boolean)),
+      prompt,
     })
       .then(() => pollSessionSummary(current.id, previous, applySessionSummary))
       .catch(() => undefined);
@@ -805,11 +782,9 @@ function AgentChatSession({
     window.clearTimeout(documentSaveRef.current);
     documentSaveRef.current = window.setTimeout(() => {
       setDocumentSaving(true);
-      void fetch(`/api/documents/${documentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      }).finally(() => setDocumentSaving(false));
+      void fetchJson(`/api/documents/${documentId}`, "PATCH", { content }).finally(() =>
+        setDocumentSaving(false),
+      );
     }, 700);
   };
 

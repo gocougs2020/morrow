@@ -1,17 +1,17 @@
-# Morrow
+# Jarvis
 
 [![CI](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gocougs2020/morrow/actions/workflows/ci.yml)
 
-Morrow is an opinionated but flexible workspace for [eve](https://eve.dev) AI agents. One deploy is one team workspace: files, sessions, memory, inbox, and usage are designed a certain way. Models, skills, connections, and instructions are yours to change.
+Jarvis is an opinionated but flexible, deployable workspace for quickly building AI agents. One deploy is one team workspace: files, sessions, memory, inbox, and usage are designed a certain way. Models, skills, connections, and instructions are yours to change.
 
-Fork, configure, and deploy. Next.js web chat, Better Auth, Neon (or local SQLite), AI Gateway models, skills, memory, files, and scheduled jobs. Don’t wait for tomorrow—deploy today with Morrow.
+Fork, configure, and deploy. Web chat, files, memory, skills, scheduled jobs, and inbox.
 
 MIT licensed. Current tag is **0.2.0** — bump `package.json` when you tag the next release. See [CHANGELOG.md](./CHANGELOG.md) if you forked and are pulling updates, plus [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md).
 
 Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who can sign in live in environment variables.
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Morrow home: skill chips and a /write prompt" width="880" />
+  <img src="docs/screenshots/home.png" alt="Jarvis home: skill chips and a /write prompt" width="880" />
 </p>
 
 <p align="center">
@@ -20,24 +20,26 @@ Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who
 
 ## Features
 
-- Durable sessions with stable URLs (eve)
-- First-prompt model routing (AI Gateway)
+- Durable sessions with stable URLs
+- First-prompt model routing
 - Durable and scalable memory (sticky notes + embeddings)
-- Voice-to-text input (gpt-transcribe from OpenAI)
-- Native files storage (Vercel Blob; “Dropbox-lite”)
-- Inbox for agent mail (send and receive via Resend)
-- Built-in and user-authored skills (eve skills)
+- Voice-to-text input
+- Private file storage
+- Inbox for agent mail (send and receive)
+- Built-in and user-authored skills
 - Slash-command skill invoke (`/slug`)
-- Scheduled jobs (eve schedules; Vercel compiles the dispatcher into a Cron Job, plus Run now in Settings). Hobby (the default, or no `VERCEL_TOKEN`) is at most once a day. Pro or Enterprise plus `VERCEL_TOKEN` unlocks hourly and minute-level jobs after a redeploy. Each run is a session, hidden from Sessions until you include scheduled runs. `/remind` creates a one-off job: a nudge emails you (optional session/file context only if a tight embedding match clears the floor), or a do-job checks prior work then acts, then emails you with a link to that session and deletes the job.
+- Scheduled jobs, plus Run now in Settings. The default host plan is at most once a day. A Pro or Enterprise host plus `VERCEL_TOKEN` unlocks hourly and minute-level jobs after a redeploy. Each run is a session, hidden from Sessions until you include scheduled runs. `/remind` creates a one-off job: a nudge emails you (optional session/file context only if a tight embedding match clears the floor), or a do-job checks prior work then acts, then emails you with a link to that session and deletes the job.
 - Installable PWA (Add to Home Screen)
 - Session file canvas (files beside the chat)
-- Automatic context compaction (eve)
+- Automatic context compaction
 - User vs Account usage+cost dashboard (token and cost ledger)
 - Related-session citations (embeddings)
 - Custom instruction overlay (per-user, on top of agent instructions)
 - Signup allowlist (env emails and domains)
 - Email verification on signup (Resend; local without Resend logs the link)
 - One-file product config (`app.config.ts`)
+
+Jarvis is built on the open-source [eve](https://eve.dev) agent framework. You configure the product in `app.config.ts` and the `agent/` directory; you do not need eve-specific knowledge to deploy or use it.
 
 **How to hide the home setup screen.** Until you set `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS`, the home page is a setup checklist — locally and on the live site. Completing the other steps (secret, Gateway, Neon, Blob) does not dismiss it. Add your email or a company domain, restart `npm run dev` (or redeploy on Vercel), and that home-page checklist is gone. See [Lock who can sign in](#lock-who-can-sign-in). After you sign in, **Settings → Setup** still shows what’s left (voice, Inbox, and any unfinished host settings). To hide or delete that signed-in page, see [Remove the in-app setup page](#remove-the-in-app-setup-page).
 
@@ -47,18 +49,18 @@ Product defaults live in **[`app.config.ts`](./app.config.ts)**. Secrets and who
 
 You need a [GitHub](https://github.com/signup) account and a [Vercel](https://vercel.com/signup) account (both free). About 10 minutes for the Deploy button.
 
-**Settings files in one sentence.** Private values (passwords, API keys, who may sign in) are not stored in the public code. On your computer they go in a file named `.env.local`. On the live site they go in Vercel → your project → **Settings → Environment Variables**. The on-screen checklist watches those settings and checks off each step.
+**Settings files in one sentence.** Private values (passwords, API keys, who may sign in) are not stored in the public code. On your computer they go in a file named `.env.local`. On the live site they go in Vercel → your project → **Settings → Environment Variables**. The **Set up your workspace** checklist is environment-specific: `npm run dev` asks for `.env.local` values; the production URL asks for the Vercel project variables that are actually missing.
 
 ### Deploy on Vercel (recommended)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow&project-name=morrow&repository-name=morrow&env=BETTER_AUTH_SECRET%2CBETTER_AUTH_URL%2CALLOWED_SIGNUP_EMAILS&envDescription=BETTER_AUTH_SECRET%3A+32%2B+random+characters.+BETTER_AUTH_URL%3A+your+live+origin+including+https%3A%2F%2F+%28https%3A%2F%2FYOUR-PROJECT.vercel.app%29.+ALLOWED_SIGNUP_EMAILS%3A+your+email+-+hides+the+setup+page+and+blocks+strangers+from+using+your+models.&envLink=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow%23environment-variables&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%2C%22allowConnectExistingProduct%22%3Atrue%7D%2C%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22private%22%7D%5D)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow&project-name=jarvis&repository-name=jarvis&env=BETTER_AUTH_SECRET%2CBETTER_AUTH_URL%2CALLOWED_SIGNUP_EMAILS&envDescription=BETTER_AUTH_SECRET%3A+32%2B+random+characters.+BETTER_AUTH_URL%3A+your+live+origin+including+https%3A%2F%2F+%28https%3A%2F%2FYOUR-PROJECT.vercel.app%29.+ALLOWED_SIGNUP_EMAILS%3A+your+email+-+hides+the+setup+page+and+blocks+strangers+from+using+your+models.&envLink=https%3A%2F%2Fgithub.com%2Fgocougs2020%2Fmorrow%23environment-variables&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%2C%22allowConnectExistingProduct%22%3Atrue%7D%2C%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22private%22%7D%5D)
 
 The button copies this repo into your GitHub account and creates a Vercel project. The wizard asks you to type three values (it cannot fill secrets for you — they would sit in the browser history) and offers Neon plus private Blob:
 
 | Name | What to type |
 | --- | --- |
 | `BETTER_AUTH_SECRET` | 32+ random characters. Treat it like a password; do not commit it. |
-| `BETTER_AUTH_URL` | Your live origin, including `https://`. Use `https://YOUR-PROJECT.vercel.app` (the project name you pick, default `morrow`) or your custom domain. You can fix this in Settings after the first deploy if the URL is not known yet. |
+| `BETTER_AUTH_URL` | Your live origin, including `https://`. Use `https://YOUR-PROJECT.vercel.app` (the project name you pick, default `jarvis`) or your custom domain. You can fix this in Settings after the first deploy if the URL is not known yet. |
 | `ALLOWED_SIGNUP_EMAILS` | Your email. This hides the setup checklist and stops strangers from spending your model budget. |
 
 Accept Neon and **private** Blob when offered. A linked Vercel project can call models with OIDC, so you do not have to paste `AI_GATEWAY_API_KEY` here.
@@ -142,7 +144,7 @@ Use this if you forked and imported on [vercel.com/new](https://vercel.com/new) 
 5. **Blob** — Storage → Create → Blob, **private**. Vercel adds `BLOB_READ_WRITE_TOKEN`. Uploads and some memory notes need this on the live site.
 6. Redeploy (Deployments → ⋯ → Redeploy) so those settings take effect.
 
-The **Put the app on Vercel** checkbox on the setup page turns green when you open the live site (not localhost).
+On the live site the setup page lists Vercel project settings (public URL, Neon, Blob, and who can sign in). It does not ask you to create `.env.local`.
 
 ### Lock who can sign in
 
@@ -166,7 +168,7 @@ When you want to change the product name, home-page chips, or models, edit `app.
 
 ## After the first deploy
 
-The **Set up your workspace** page on `/` stays up until `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS` is set in that environment (`.env.local` on your computer, Vercel env on the live site). Other completed checklist items do not hide it. Then the home page is signed-in chat.
+The **Set up your workspace** page on `/` stays up until `ALLOWED_SIGNUP_EMAILS` or `ALLOWED_SIGNUP_DOMAINS` is set in that environment (`.env.local` on your computer, Vercel env on the live site). Locally the list is secret, AI Gateway key, and allowlist. On Vercel it is the project env that production needs. Other completed checklist items do not hide it. Then the home page is signed-in chat.
 
 Signed-in users can still open **Settings → Setup** (`/settings/setup`) to see remaining environment settings — voice (`OPENAI_API_KEY`), Inbox (`RESEND_*`), the Account usage allowlist, and any unfinished host steps. The page never prints secret values.
 
@@ -191,7 +193,7 @@ Leave `lib/setup-status.ts` and the public checklist on `/` in place. Those stil
 - A Usage page with running session, turn, token, and cost totals — including by day
 - Installable as a home-screen app on iPhone and Android (PWA). Push notifications are not enabled yet.
 
-One Vercel project is one workspace. **Shared** files, skills, and schedules
+One deployment is one workspace. **Shared** files, skills, and schedules
 are visible and editable by every signed-in account on that deployment.
 **Public** adds an unguessable `/d/...` link on the internet. **Private**
 is only you. This is not a multi-tenant SaaS — use allowlists if the URL is public.
@@ -208,8 +210,8 @@ This is the file to change after you deploy a copy of the repo. Values below are
 
 ```ts
 brand: {
-  name: "Morrow",
-  tagline: "A deployable workspace for eve agents. Don’t wait for tomorrow—deploy with Morrow",
+  name: "Jarvis",
+  tagline: "An opinionated but flexible workspace for quickly building AI agents.",
 },
 home: {
   promptPlaceholder: "Ask anything...",
@@ -235,7 +237,7 @@ Current defaults — a general starter kit (work, home, and a couple of creative
 - `image`, `household`, `story`, `decide`, `weekly-review`, `remind`
 - `intake`, `files`, `memory`
 
-These are examples of procedures you can ship with eve, not a vertical product. Hide or replace any of them via `skills.<slug>.suggest` / `.enabled`, or add your own folder under `agent/skills/`.
+These are examples of procedures you can ship with Jarvis, not a vertical product. Hide or replace any of them via `skills.<slug>.suggest` / `.enabled`, or add your own folder under `agent/skills/`.
 
 `/remind` (aliases `/reminder`, `/reminders`) creates a one-off job. A nudge omits `skill` and emails you. A do-job passes `skill: remind`, checks prior work, then emails. Both delete the job after it fires. Nudge emails may attach one prior session and one file when those embeddings clear the reminder floors below.
 
@@ -354,7 +356,7 @@ ALLOWED_ACCOUNT_USAGE_EMAILS=ada@agency.com
 | `BLOB_READ_WRITE_TOKEN` | Production | Vercel Blob for private files and file memory. Local fallback is `.data/blobs/` |
 | `RESEND_API_KEY` | Signup + Inbox | Verification emails on signup, plus agent send/receive. Get a key at [resend.com/api-keys](https://resend.com/api-keys). Required for production signup. Local `npm run dev` without it prints the verification URL in the server log. |
 | `RESEND_WEBHOOK_SECRET` | For inbound | Signing secret from Resend → Webhooks (`email.received`) |
-| `RESEND_FROM_EMAIL` | Signup + mailbox | Verified workspace `From` for signup and other notices, e.g. `Morrow <agent@yourdomain.com>`. Each user's send/receive address is a plus-tag on this mailbox (or the inbound allowlist). |
+| `RESEND_FROM_EMAIL` | Signup + mailbox | Verified workspace `From` for signup and other notices, e.g. `Jarvis <agent@yourdomain.com>`. Each user's send/receive address is a plus-tag on this mailbox (or the inbound allowlist). |
 | `RESEND_INBOUND_ADDRESSES` | Optional | Extra mailboxes that can host user plus-addresses, comma-separated. |
 | `RESEND_INBOUND_DOMAINS` | Optional | Extra inbound domains, comma-separated. A plus-tagged user address on those domains is accepted. |
 | `MSB_HOME` | Recommended | Keep `.eve/msb-home` so this project’s microsandbox state stays isolated |

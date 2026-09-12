@@ -1,5 +1,8 @@
+import type { UserContent } from "ai";
+import type { ChannelReceiveContext } from "eve/channels";
 import { type AuthFn, localDev, vercelOidc } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
+import type { SessionAuthContext } from "eve/context";
 import {
   SCHEDULE_DISPATCH_CHAT_HEADER,
   SCHEDULE_DISPATCH_JOB_HEADER,
@@ -7,8 +10,10 @@ import {
   SCHEDULE_DISPATCH_SECRET_HEADER,
   SCHEDULE_DISPATCH_USER_HEADER,
   scheduleDispatchSecret,
+  scheduleSessionAuth,
 } from "../../lib/dispatch-jobs";
 import { findUserById } from "../../lib/email-users";
+import { eveReceiveAddress } from "../../lib/eve-receive";
 
 function betterAuthSession(): AuthFn<Request> {
   return async (request) => {
@@ -41,25 +46,32 @@ function scheduleDispatchAuth(): AuthFn<Request> {
     const userId = request.headers.get(SCHEDULE_DISPATCH_USER_HEADER)?.trim();
     if (!userId) return null;
     const owner = await findUserById(userId);
-    const chatId = request.headers.get(SCHEDULE_DISPATCH_CHAT_HEADER)?.trim();
-    const scheduleId = request.headers.get(SCHEDULE_DISPATCH_JOB_HEADER)?.trim();
-    const reminder = request.headers.get(SCHEDULE_DISPATCH_REMINDER_HEADER) === "1";
-    return {
-      authenticator: "better-auth",
-      principalId: userId,
-      principalType: "user",
-      attributes: {
-        source: "schedule",
-        ...(reminder ? { reminder: "1" } : {}),
-        ...(owner?.email ? { email: owner.email } : {}),
-        ...(owner?.name ? { name: owner.name } : {}),
-        ...(chatId ? { chatId } : {}),
-        ...(scheduleId ? { scheduleId } : {}),
-      },
-    };
+    return scheduleSessionAuth({
+      userId,
+      email: owner?.email,
+      name: owner?.name,
+      chatId: request.headers.get(SCHEDULE_DISPATCH_CHAT_HEADER)?.trim(),
+      scheduleId: request.headers.get(SCHEDULE_DISPATCH_JOB_HEADER)?.trim(),
+      reminder: request.headers.get(SCHEDULE_DISPATCH_REMINDER_HEADER) === "1",
+    });
   };
 }
 
-export default eveChannel({
+const channel = eveChannel({
   auth: [scheduleDispatchAuth(), betterAuthSession(), vercelOidc(), localDev()],
+});
+
+// eveChannel() has no receive option. Schedules and the email channel start
+// web sessions with to(eve, { address }).send(...).
+export default Object.assign(channel, {
+  receive(
+    input: {
+      message: string | UserContent;
+      target: Readonly<Record<string, unknown>>;
+      auth: SessionAuthContext | null;
+    },
+    { from }: ChannelReceiveContext,
+  ) {
+    return from(eveReceiveAddress(input.target)).send(input.message, { auth: input.auth });
+  },
 });

@@ -70,8 +70,8 @@ export type AppConfig = {
 
 export const appConfig = {
   brand: {
-    name: "Morrow",
-    tagline: "A deployable workspace for eve agents. Don't wait for tomorrow—deploy with Morrow",
+    name: "Jarvis",
+    tagline: "An opinionated but flexible workspace for quickly building AI agents.",
   },
 
   home: {

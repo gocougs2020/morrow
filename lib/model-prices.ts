@@ -1,5 +1,3 @@
-import { appConfig } from "@/app.config";
-
 /** USD per 1M tokens. Long-context rates apply to the whole request above the threshold. */
 export type ModelTokenRates = {
   readonly input: number;
@@ -156,8 +154,4 @@ export function estimateTranscriptionCostUsd(durationSeconds?: number, audioByte
         ? audioBytes / (3_000 * 60)
         : 0;
   return Math.max(0, minutes) * TRANSCRIPTION_USD_PER_MINUTE;
-}
-
-export function defaultChatModelId(): string {
-  return appConfig.models.chatFast;
 }

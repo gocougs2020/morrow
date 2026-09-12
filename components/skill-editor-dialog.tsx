@@ -29,6 +29,7 @@ import {
   parseSkillDocument,
 } from "@/lib/skill-document";
 import type { UserSkill } from "@/lib/types";
+import { fetchJson } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -114,17 +115,13 @@ function SkillEditorForm({
     setGenerating(true);
     setError(undefined);
     try {
-      const response = await fetch("/api/instructions/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          current: draft.markdown,
-          kind: "skill",
-          prompt: trimmed,
-          skillDescription: draft.description,
-          skillName: draft.name,
-          skillSlug: draft.slug,
-        }),
+      const response = await fetchJson("/api/instructions/generate", "POST", {
+        current: draft.markdown,
+        kind: "skill",
+        prompt: trimmed,
+        skillDescription: draft.description,
+        skillName: draft.name,
+        skillSlug: draft.slug,
       });
       const payload = (await response.json().catch(() => ({}))) as {
         description?: string;

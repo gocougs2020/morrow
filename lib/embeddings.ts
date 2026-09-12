@@ -1,8 +1,7 @@
-import { embed, embedMany } from "ai";
+import { embedMany } from "ai";
 import { appConfig } from "@/app.config";
 
 export const EMBEDDING_MODEL = appConfig.models.embeddings;
-export const EMBEDDING_DIMENSIONS = 1536;
 export const MAX_EMBED_CHARS = 24_000;
 
 export function clipForEmbedding(text: string): string {
@@ -27,25 +26,11 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
-export async function embedText(value: string): Promise<number[] | null> {
-  const text = clipForEmbedding(value);
-  if (!text) return null;
-  const result = await embed({
-    model: EMBEDDING_MODEL,
-    value: text,
-  });
-  void import("@/lib/record-usage").then(({ recordEmbeddingUsage }) =>
-    recordEmbeddingUsage(EMBEDDING_MODEL, result.usage),
-  );
-  return result.embedding;
-}
-
+/** Embed each value; empty (post-clip) inputs yield `null` at the same index. */
 export async function embedTexts(values: string[]): Promise<(number[] | null)[]> {
-  const clipped = values.map((value) => clipForEmbedding(value));
-  const pending = clipped.map((text, index) => ({ index, text }));
-  const nonempty = pending.filter((item) => item.text);
-  const embeddings: (number[] | null)[] = clipped.map((text) => (text ? null : null));
-
+  const clipped = values.map(clipForEmbedding);
+  const nonempty = clipped.flatMap((text, index) => (text ? [{ index, text }] : []));
+  const embeddings: (number[] | null)[] = clipped.map(() => null);
   if (nonempty.length === 0) return embeddings;
 
   const result = await embedMany({

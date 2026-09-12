@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getNeonDb, getSqliteDb, hasNeon } from "@/lib/db";
 import { pgUser, sqliteUser } from "@/lib/db/schema";
 
@@ -22,25 +22,6 @@ export function parseAddressList(
     .flatMap((entry) => String(entry).split(","))
     .map((entry) => normalizeEmailAddress(entry))
     .filter((entry) => entry.includes("@"));
-}
-
-export async function findUserByEmail(email: string): Promise<AppUser | null> {
-  const normalized = normalizeEmailAddress(email);
-  if (!normalized) return null;
-  if (hasNeon()) {
-    const [row] = await getNeonDb()
-      .select({ id: pgUser.id, email: pgUser.email, name: pgUser.name })
-      .from(pgUser)
-      .where(sql`lower(${pgUser.email}) = ${normalized}`)
-      .limit(1);
-    return row ?? null;
-  }
-  const rows = await getSqliteDb()
-    .select({ id: sqliteUser.id, email: sqliteUser.email, name: sqliteUser.name })
-    .from(sqliteUser)
-    .where(sql`lower(${sqliteUser.email}) = ${normalized}`)
-    .limit(1);
-  return rows[0] ?? null;
 }
 
 export async function listAppUsers(): Promise<AppUser[]> {

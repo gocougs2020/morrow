@@ -6,6 +6,7 @@ type StartBody = {
   prompt?: string;
   email?: string;
   name?: string;
+  chatId?: string;
 };
 
 export default defineChannel({
@@ -21,7 +22,8 @@ export default defineChannel({
         return Response.json({ error: "userId and prompt are required." }, { status: 400 });
       }
 
-      const session = await to(eve, {}).send(body.prompt, {
+      const chatId = body.chatId?.trim();
+      const session = await to(eve, chatId ? { address: chatId } : {}).send(body.prompt, {
         auth: {
           authenticator: "better-auth",
           principalId: body.userId,
@@ -29,6 +31,7 @@ export default defineChannel({
           attributes: {
             ...(body.email ? { email: body.email } : {}),
             ...(body.name ? { name: body.name } : {}),
+            ...(chatId ? { chatId } : {}),
             source: "email",
           },
         },

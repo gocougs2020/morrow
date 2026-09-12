@@ -83,11 +83,6 @@ export type UsageUserRow = {
   readonly totals: UsageTotals;
 };
 
-export type ChatUsageSnapshot = {
-  readonly extras: UsageTotals;
-  readonly totals: UsageTotals;
-};
-
 export function emptyUsageTotals(): UsageTotals {
   return { ...emptyUsageTokens(), costUsd: 0, calls: 0 };
 }
@@ -141,17 +136,6 @@ export function languageModelUsageFromTokens(tokens: UsageTokens): LanguageModel
     },
     outputTokens: tokens.outputTokens || undefined,
     totalTokens: (tokens.inputTokens + tokens.outputTokens) || undefined,
-  };
-}
-
-export function tokensFromLanguageModelUsage(usage: LanguageModelUsage | undefined): UsageTokens {
-  if (!usage) return emptyUsageTokens();
-  return {
-    inputTokens: usage.inputTokens ?? 0,
-    outputTokens: usage.outputTokens ?? 0,
-    reasoningTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,
-    cacheReadTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
-    cacheWriteTokens: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
   };
 }
 
@@ -512,22 +496,6 @@ export function formatTokenCount(value: number): string {
 
 export function formatCount(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
-}
-
-export function isUsagePurpose(value: unknown): value is UsagePurpose {
-  return (
-    value === "chat" ||
-    value === "compaction" ||
-    value === "routing" ||
-    value === "session_title" ||
-    value === "session_memory" ||
-    value === "embeddings" ||
-    value === "instructions" ||
-    value === "transcription" ||
-    value === "image" ||
-    value === "web_search" ||
-    value === "email"
-  );
 }
 
 export type UsageSessionRow = {

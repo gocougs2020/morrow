@@ -8,6 +8,11 @@ import { OutLink, SetupStep } from "@/components/setup-step";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  shouldShowRequiredSetupStep,
+  visibleRequiredSetupSteps,
+  type RequiredSetupStepId,
+} from "@/lib/setup-steps";
 import type { SetupStatus } from "@/lib/setup-status";
 import { cn } from "@/lib/utils";
 
@@ -30,18 +35,7 @@ type SetupItemId =
   | "inbox"
   | "accountUsage";
 
-const requiredItems: readonly SetupItemId[] = [
-  "authSecret",
-  "aiGateway",
-  "hosted",
-  "authUrl",
-  "database",
-  "blob",
-  "allowlist",
-];
-
 const optionalItems: readonly SetupItemId[] = ["voice", "inbox", "accountUsage"];
-const allItems: readonly SetupItemId[] = [...requiredItems, ...optionalItems];
 
 export function WorkspaceSetup({
   initialStatus,
@@ -51,11 +45,14 @@ export function WorkspaceSetup({
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const firstOpen = allItems.find((id) => !status[id]) ?? allItems[0];
+  const visibleRequired = visibleRequiredSetupSteps(status);
+  const visibleItems: readonly SetupItemId[] = [...visibleRequired, ...optionalItems];
+  const firstOpen = visibleItems.find((id) => !status[id]) ?? visibleItems[0];
   const [openId, setOpenId] = useState<SetupItemId>(firstOpen);
+  const show = (id: RequiredSetupStepId) => shouldShowRequiredSetupStep(id, status);
 
-  const remaining = allItems.filter((id) => !status[id]).length;
-  const progress = Math.round(((allItems.length - remaining) / allItems.length) * 100);
+  const remaining = visibleItems.filter((id) => !status[id]).length;
+  const progress = Math.round(((visibleItems.length - remaining) / visibleItems.length) * 100);
 
   async function refreshStatus() {
     setBusy(true);
@@ -109,14 +106,15 @@ export function WorkspaceSetup({
         <p className="text-muted-foreground text-sm leading-relaxed">
           {status.hosted ? (
             <>
-              On Vercel, add missing names under Settings → Environment Variables, then redeploy.
-              This checklist only reports whether a value is set.
+              This list is the environment variables on this Vercel deployment. Add missing names
+              under Settings → Environment Variables, then redeploy. The page never prints secret
+              values.
             </>
           ) : (
             <>
-              On this computer, put missing names in <code className="font-mono">.env.local</code>,
-              restart <code className="font-mono">npm run dev</code>, then Refresh. The live site
-              needs the same names on the Vercel project.
+              This list is the values in <code className="font-mono">.env.local</code> on this
+              computer. Put missing names there, restart <code className="font-mono">npm run
+              dev</code>, then Refresh.
             </>
           )}
         </p>
@@ -126,99 +124,103 @@ export function WorkspaceSetup({
             Required
           </h2>
           <ol className="overflow-hidden rounded-xl border bg-card">
-            <SetupStep
-              done={status.authSecret}
-              id="authSecret"
-              open={openId === "authSecret"}
-              onOpen={() => setOpenId("authSecret")}
-              title="Sign-in secret"
-            >
-              <p>
-                <code className="font-mono">BETTER_AUTH_SECRET</code> — a 32+ character random
-                string that signs auth cookies. Generate one locally from the first-run checklist,
-                or paste a new value on Vercel.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.aiGateway}
-              id="aiGateway"
-              open={openId === "aiGateway"}
-              onOpen={() => setOpenId("aiGateway")}
-              title="AI Gateway"
-            >
-              <p>
-                <code className="font-mono">AI_GATEWAY_API_KEY</code> on this computer. On Vercel a
-                linked project can use OIDC instead. Create a key at{" "}
-                <OutLink href={AI_GATEWAY_KEYS_URL}>AI Gateway API keys</OutLink>.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.hosted}
-              id="hosted"
-              open={openId === "hosted"}
-              onOpen={() => setOpenId("hosted")}
-              title="Live site on Vercel"
-            >
-              <p>
-                This box turns green when you open the deployed site, not localhost. Import the
-                repo at vercel.com/new if you have not deployed yet.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.authUrl}
-              id="authUrl"
-              open={openId === "authUrl"}
-              onOpen={() => setOpenId("authUrl")}
-              title="Public website address"
-            >
-              <p>
-                <code className="font-mono">BETTER_AUTH_URL</code> must be your live origin,
-                including <code className="font-mono">https://</code>. Localhost is already
-                correct on this computer.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.database}
-              id="database"
-              open={openId === "database"}
-              onOpen={() => setOpenId("database")}
-              title="Neon database"
-            >
-              <p>
-                <code className="font-mono">DATABASE_URL</code> — required on the live site so
-                accounts and chats survive deploys. Locally a file store is fine. Add Neon from
-                Vercel → Storage, or the{" "}
-                <OutLink href={NEON_MARKETPLACE_URL}>Marketplace</OutLink>.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.blob}
-              id="blob"
-              open={openId === "blob"}
-              onOpen={() => setOpenId("blob")}
-              title="File storage"
-            >
-              <p>
-                <code className="font-mono">BLOB_READ_WRITE_TOKEN</code> — Vercel Blob for uploads
-                and some memory notes. Locally a folder under{" "}
-                <code className="font-mono">.data/</code> is used instead. See the{" "}
-                <OutLink href={BLOB_DOCS_URL}>Blob guide</OutLink>.
-              </p>
-            </SetupStep>
-            <SetupStep
-              done={status.allowlist}
-              id="allowlist"
-              last
-              open={openId === "allowlist"}
-              onOpen={() => setOpenId("allowlist")}
-              title="Who can sign in"
-            >
-              <p>
-                <code className="font-mono">ALLOWED_SIGNUP_EMAILS</code> or{" "}
-                <code className="font-mono">ALLOWED_SIGNUP_DOMAINS</code> — this is the spend
-                control. Until one is set, the home page stays a public checklist.
-              </p>
-            </SetupStep>
+            {show("authSecret") ? (
+              <SetupStep
+                done={status.authSecret}
+                id="authSecret"
+                last={visibleRequired.at(-1) === "authSecret"}
+                open={openId === "authSecret"}
+                onOpen={() => setOpenId("authSecret")}
+                title="Sign-in secret"
+              >
+                <p>
+                  <code className="font-mono">BETTER_AUTH_SECRET</code> — a 32+ character random
+                  string that signs auth cookies.
+                  {status.hosted
+                    ? " Add it on this Vercel project if it is missing."
+                    : " Generate one from the first-run checklist, or paste it into .env.local."}
+                </p>
+              </SetupStep>
+            ) : null}
+            {show("aiGateway") ? (
+              <SetupStep
+                done={status.aiGateway}
+                id="aiGateway"
+                last={visibleRequired.at(-1) === "aiGateway"}
+                open={openId === "aiGateway"}
+                onOpen={() => setOpenId("aiGateway")}
+                title="AI Gateway"
+              >
+                <p>
+                  <code className="font-mono">AI_GATEWAY_API_KEY</code> in{" "}
+                  <code className="font-mono">.env.local</code>. Create a key at{" "}
+                  <OutLink href={AI_GATEWAY_KEYS_URL}>AI Gateway API keys</OutLink>.
+                </p>
+              </SetupStep>
+            ) : null}
+            {show("authUrl") ? (
+              <SetupStep
+                done={status.authUrl}
+                id="authUrl"
+                last={visibleRequired.at(-1) === "authUrl"}
+                open={openId === "authUrl"}
+                onOpen={() => setOpenId("authUrl")}
+                title="Public website address"
+              >
+                <p>
+                  <code className="font-mono">BETTER_AUTH_URL</code> on this Vercel project must be
+                  your live origin, including <code className="font-mono">https://</code>.
+                </p>
+              </SetupStep>
+            ) : null}
+            {show("database") ? (
+              <SetupStep
+                done={status.database}
+                id="database"
+                last={visibleRequired.at(-1) === "database"}
+                open={openId === "database"}
+                onOpen={() => setOpenId("database")}
+                title="Neon database"
+              >
+                <p>
+                  <code className="font-mono">DATABASE_URL</code> — required on the live site so
+                  accounts and chats survive deploys. Add Neon from Vercel → Storage, or the{" "}
+                  <OutLink href={NEON_MARKETPLACE_URL}>Marketplace</OutLink>.
+                </p>
+              </SetupStep>
+            ) : null}
+            {show("blob") ? (
+              <SetupStep
+                done={status.blob}
+                id="blob"
+                last={visibleRequired.at(-1) === "blob"}
+                open={openId === "blob"}
+                onOpen={() => setOpenId("blob")}
+                title="File storage"
+              >
+                <p>
+                  <code className="font-mono">BLOB_READ_WRITE_TOKEN</code> — Vercel Blob for
+                  uploads and some memory notes. See the{" "}
+                  <OutLink href={BLOB_DOCS_URL}>Blob guide</OutLink>.
+                </p>
+              </SetupStep>
+            ) : null}
+            {show("allowlist") ? (
+              <SetupStep
+                done={status.allowlist}
+                id="allowlist"
+                last={visibleRequired.at(-1) === "allowlist"}
+                open={openId === "allowlist"}
+                onOpen={() => setOpenId("allowlist")}
+                title="Who can sign in"
+              >
+                <p>
+                  <code className="font-mono">ALLOWED_SIGNUP_EMAILS</code> or{" "}
+                  <code className="font-mono">ALLOWED_SIGNUP_DOMAINS</code> — this is the spend
+                  control. Until one is set, the home page stays a public checklist.
+                </p>
+              </SetupStep>
+            ) : null}
           </ol>
         </section>
 
@@ -235,9 +237,10 @@ export function WorkspaceSetup({
               title="Voice input"
             >
               <p>
-                <code className="font-mono">OPENAI_API_KEY</code> — transcription for spoken
-                prompts. Chat still works without it. Create a key at{" "}
-                <OutLink href={OPENAI_KEYS_URL}>OpenAI API keys</OutLink>.
+                <code className="font-mono">OPENAI_API_KEY</code>
+                {status.hosted ? " on this Vercel project" : <> in <code className="font-mono">.env.local</code></>}
+                {" "}— transcription for spoken prompts. Chat still works without it. Create a key
+                at <OutLink href={OPENAI_KEYS_URL}>OpenAI API keys</OutLink>.
               </p>
             </SetupStep>
             <SetupStep
@@ -249,9 +252,10 @@ export function WorkspaceSetup({
             >
               <p>
                 <code className="font-mono">RESEND_API_KEY</code> and{" "}
-                <code className="font-mono">RESEND_FROM_EMAIL</code> so signup can send a
-                verification link and the agent can send and receive mail. Get a key at{" "}
-                <OutLink href={RESEND_KEYS_URL}>Resend</OutLink>. Inbound also needs{" "}
+                <code className="font-mono">RESEND_FROM_EMAIL</code>
+                {status.hosted ? " on this Vercel project" : <> in <code className="font-mono">.env.local</code></>}
+                {" "}so signup can send a verification link and the agent can send and receive mail.
+                Get a key at <OutLink href={RESEND_KEYS_URL}>Resend</OutLink>. Inbound also needs{" "}
                 <code className="font-mono">RESEND_WEBHOOK_SECRET</code> — the README has the
                 webhook steps.
               </p>

@@ -64,7 +64,7 @@ import {
 } from "@/lib/schedule-prompt";
 import type { ScheduledJob } from "@/lib/types";
 import { MIN_HOBBY_INTERVAL_MINUTES } from "@/lib/vercel-plan";
-import { cn } from "@/lib/utils";
+import { cn, fetchJson } from "@/lib/utils";
 
 const SAVE_DEBOUNCE_MS = 500;
 const HOURLY_MINUTES = [0, 15, 30, 45];
@@ -148,15 +148,11 @@ export function ScheduleRow({
     setGenerating(true);
     setError(undefined);
     try {
-      const response = await fetch("/api/jobs/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentCadence: cadence,
-          currentPrompt: job.prompt,
-          prompt: trimmed,
-          timezone: cadence.timezone,
-        }),
+      const response = await fetchJson("/api/jobs/generate", "POST", {
+        currentCadence: cadence,
+        currentPrompt: job.prompt,
+        prompt: trimmed,
+        timezone: cadence.timezone,
       });
       const payload = (await response.json().catch(() => ({}))) as {
         brief?: string;
@@ -599,11 +595,7 @@ export function ScheduleRow({
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => {
-                      void fetch("/api/jobs", {
-                        method: "DELETE",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ id: job.id }),
-                      }).then(() => onRefresh());
+                      void fetchJson("/api/jobs", "DELETE", { id: job.id }).then(() => onRefresh());
                     }}
                   >
                     Delete
@@ -807,11 +799,7 @@ async function patchJob(
   patch: { prompt?: string; enabled?: boolean; cadence?: JobCadence },
 ): Promise<ScheduledJob> {
   try {
-    const response = await fetch("/api/jobs", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...patch }),
-    });
+    const response = await fetchJson("/api/jobs", "PATCH", { id, ...patch });
     const payload = (await response.json().catch(() => ({}))) as {
       job?: ScheduledJob;
       error?: string;

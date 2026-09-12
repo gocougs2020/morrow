@@ -53,7 +53,7 @@ import { pushClientUrl } from "@/lib/start-web-session";
 import { VisibilityToggle, visibilityBadgeLabel } from "@/components/visibility-toggle";
 import { UPLOAD_FILE_ERROR, uploadFiles as postLibraryUploads } from "@/components/documents-upload";
 import type { ClientDocument, ClientFolder, DocumentSearchHit } from "@/lib/types";
-import { cn, formatBytes, formatRelativeTime } from "@/lib/utils";
+import { cn, fetchJson, formatBytes, formatRelativeTime } from "@/lib/utils";
 import type { ResourceVisibility } from "@/lib/visibility";
 
 const blankKinds = [
@@ -215,15 +215,11 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
   const createBlank = async (kind: BlankKind) => {
     setCreating(true);
     setError(undefined);
-    const response = await fetch("/api/documents", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content: kind === "csv" ? "Column 1,Column 2\n," : "",
-        folderId: currentFolderId,
-        kind,
-        title: kind === "csv" ? "Untitled spreadsheet" : "Untitled file",
-      }),
+    const response = await fetchJson("/api/documents", "POST", {
+      content: kind === "csv" ? "Column 1,Column 2\n," : "",
+      folderId: currentFolderId,
+      kind,
+      title: kind === "csv" ? "Untitled spreadsheet" : "Untitled file",
     });
     setCreating(false);
     if (!response.ok) {
@@ -271,16 +267,16 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
     }
     setCreating(true);
     setError(undefined);
-    const response = await fetch(editingFolder ? `/api/folders/${editingFolder.id}` : "/api/folders", {
-      method: editingFolder ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const response = await fetchJson(
+      editingFolder ? `/api/folders/${editingFolder.id}` : "/api/folders",
+      editingFolder ? "PATCH" : "POST",
+      {
         name,
         description: folderDescription,
         parentId: editingFolder ? editingFolder.parentId : currentFolderId,
         visibility: folderVisibility,
-      }),
-    });
+      },
+    );
     setCreating(false);
     if (!response.ok) {
       setError("Unable to save that folder.");
@@ -327,11 +323,7 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
   };
 
   const moveDocument = async (documentId: string, folderId: string | null) => {
-    const response = await fetch(`/api/documents/${documentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ folderId }),
-    });
+    const response = await fetchJson(`/api/documents/${documentId}`, "PATCH", { folderId });
     if (!response.ok) {
       setError("Unable to move that file.");
       return false;
@@ -346,11 +338,7 @@ export function DocumentsLibrary({ library }: { readonly library: DocumentLibrar
   };
 
   const moveFolder = async (folderId: string, parentId: string | null) => {
-    const response = await fetch(`/api/folders/${folderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentId }),
-    });
+    const response = await fetchJson(`/api/folders/${folderId}`, "PATCH", { parentId });
     if (!response.ok) {
       setError("Unable to move that folder.");
       return;

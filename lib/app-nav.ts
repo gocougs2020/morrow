@@ -31,8 +31,6 @@ export function getAppAccountNavItems(): readonly AppNavItem[] {
   return [...accountNavBase, setupNavItem];
 }
 
-export const appAccountNavItems = getAppAccountNavItems();
-
 export function isAppNavActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   if (href === "/settings") return pathname === "/settings";
